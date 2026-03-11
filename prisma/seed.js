@@ -307,7 +307,7 @@ async function main() {
             images: {
                 create: [
                     { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1771413536/Cono_ufddeh.png', isPrimary: true, order: 0 },
-                    { url: 'https://images.unsplash.com/photo-1611078564883-8a033f6a6b57?q=80&w=400', isPrimary: false, order: 1 }
+                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1771413536/ConoMilemetrico_pgtmvc.png', isPrimary: false, order: 1 }
                 ]
             },
             categoryId: catBronce.id,
@@ -427,8 +427,8 @@ async function main() {
             displayOrder: 5,
             images: {
                 create: [
-                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1771413536/Cono_ufddeh.png', isPrimary: true, order: 0 },
-                    { url: 'https://images.unsplash.com/photo-1611078564883-8a033f6a6b57?q=80&w=400', isPrimary: false, order: 1 }
+                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1771413536/GuiaClavija_g6hbwf.png', isPrimary: true, order: 0 },
+                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1771413536/GuiaClavijaMilimetrico_p1zwrc.png', isPrimary: false, order: 1 }
                 ]
             },
             categoryId: catBronce.id,
@@ -548,8 +548,8 @@ async function main() {
             displayOrder: 6,
             images: {
                 create: [
-                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1771413536/Cono_ufddeh.png', isPrimary: true, order: 0 },
-                    { url: 'https://images.unsplash.com/photo-1611078564883-8a033f6a6b57?q=80&w=400', isPrimary: false, order: 1 }
+                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1771416772/Tuerca_golpwg.png', isPrimary: true, order: 0 },
+                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1771417262/TuercaMilimetrico_odwxiq.png', isPrimary: false, order: 1 }
                 ]
             },
             categoryId: catBronce.id,
