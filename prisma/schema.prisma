@@ -95,3 +95,11 @@ model VariantDimension {
   variant        ProductVariant @relation(fields: [variantId], references: [id])
   variantId      Int
 }
+
+model AdminUser {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique @db.VarChar(50)
+  password  String   @db.VarChar(255)
+  role      String   @default("admin")
+  createdAt DateTime @default(now())
+}

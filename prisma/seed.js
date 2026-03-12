@@ -1,6 +1,7 @@
 // BackEnd/prisma/seed.js
 require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
@@ -252,7 +253,7 @@ async function main() {
             displayOrder: 3,
             images: {
                 create: [
-                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1771413386/unionArmadaMixta_nichld.png', isPrimary: true, order: 0 },
+                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1773319057/unionArmadaMixta_obkepc.png', isPrimary: true, order: 0 },
                     { url: 'https://images.unsplash.com/photo-1611078564883-8a033f6a6b57?q=80&w=400', isPrimary: false, order: 1 }
                 ]
             },
@@ -306,8 +307,8 @@ async function main() {
             displayOrder: 4,
             images: {
                 create: [
-                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1771413536/Cono_ufddeh.png', isPrimary: true, order: 0 },
-                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1771413536/ConoMilemetrico_pgtmvc.png', isPrimary: false, order: 1 }
+                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1773319056/Cono_uc38ro.png', isPrimary: true, order: 0 },
+                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1773319057/ConoMilemetrico_qqo2af.png', isPrimary: false, order: 1 }
                 ]
             },
             categoryId: catBronce.id,
@@ -427,8 +428,8 @@ async function main() {
             displayOrder: 5,
             images: {
                 create: [
-                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1771413536/GuiaClavija_g6hbwf.png', isPrimary: true, order: 0 },
-                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1771413536/GuiaClavijaMilimetrico_p1zwrc.png', isPrimary: false, order: 1 }
+                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1773319057/GuiaClavija_h0y3pd.png', isPrimary: true, order: 0 },
+                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1773319057/GuiaClavijaMilimetrico_qewrun.png', isPrimary: false, order: 1 }
                 ]
             },
             categoryId: catBronce.id,
@@ -548,8 +549,8 @@ async function main() {
             displayOrder: 6,
             images: {
                 create: [
-                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1771416772/Tuerca_golpwg.png', isPrimary: true, order: 0 },
-                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1771417262/TuercaMilimetrico_odwxiq.png', isPrimary: false, order: 1 }
+                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1773319057/Tuerca_hds0uw.png', isPrimary: true, order: 0 },
+                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1773319057/TuercaMilimetrico_giyud3.png', isPrimary: false, order: 1 }
                 ]
             },
             categoryId: catBronce.id,
@@ -669,7 +670,7 @@ async function main() {
             displayOrder: 7,
             images: {
                 create: [
-                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1771416771/Contratuerca_ejsmmo.png', isPrimary: true, order: 0 },
+                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1773319056/Contratuerca_kxm2cp.png', isPrimary: true, order: 0 },
                     { url: 'https://images.unsplash.com/photo-1611078564883-8a033f6a6b57?q=80&w=400', isPrimary: false, order: 1 }
                 ]
             },
@@ -821,7 +822,7 @@ async function main() {
             displayOrder: 9,
             images: {
                 create: [
-                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1771416738/Conector_Recto_aihece.png', isPrimary: true, order: 0 },
+                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1773319057/Conector_Recto_sbkpaf.png', isPrimary: true, order: 0 },
                     { url: 'https://images.unsplash.com/photo-1611078564883-8a033f6a6b57?q=80&w=400', isPrimary: false, order: 1 }
                 ]
             },
@@ -934,7 +935,7 @@ async function main() {
             displayOrder: 1,
             images: {
                 create: [
-                    { url: 'https://images.unsplash.com/photo-1590566236128-46603a123f03?q=80&w=400', isPrimary: true, order: 0 },
+                    { url: 'https://png.pngtree.com/png-clipart/20231109/original/pngtree-head-gasket-part-picture-image_13242505.png', isPrimary: true, order: 0 },
                     { url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=400', isPrimary: false, order: 1 }
                 ]
             },
@@ -974,7 +975,7 @@ async function main() {
             displayOrder: 2,
             images: {
                 create: [
-                    { url: 'https://images.unsplash.com/photo-1590674512530-01968875560b?q=80&w=400', isPrimary: true, order: 0 },
+                    { url: 'https://w7.pngwing.com/pngs/993/1019/png-transparent-washer-arruelas-stampfix-industria-de-arruelas-e-artefatos-de-metais-industry-household-hardware-lock-others-company-industry-circle.png', isPrimary: true, order: 0 },
                     { url: 'https://images.unsplash.com/photo-1588602684803-db376ca9b66c?q=80&w=400', isPrimary: false, order: 1 }
                 ]
             },
@@ -1006,6 +1007,19 @@ async function main() {
         }
     });
 
+    // 3. Crear Usuario Administrador por defecto
+    const hashedPassword = await bcrypt.hash('admin123', 10);
+    await prisma.adminUser.upsert({
+        where: { username: 'admin' },
+        update: {},
+        create: {
+            username: 'admin',
+            password: hashedPassword,
+            role: 'admin'
+        }
+    });
+
+    console.log('Usuario administrador creado/verificado.');
     console.log('Datos cargados exitosamente.');
 }
 
