@@ -927,6 +927,227 @@ async function main() {
         }
     });
 
+    // --- ACOPLAMIENTO MACHO ---
+    await prisma.product.create({
+        data: {
+            name: 'ACOPLAMIENTO MACHO',
+            description: 'Acoplamiento macho para union de cañeria, material bronce.',
+            price: 11.00,
+            displayOrder: 10,
+            images: {
+                create: [
+                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1773404159/AcoplamientoMacho_suubfl.png', isPrimary: true, order: 0 },
+                    { url: 'https://images.unsplash.com/photo-1611078564883-8a033f6a6b57?q=80&w=400', isPrimary: false, order: 1 }
+                ]
+            },
+            categoryId: catBronce.id,
+            variants: {
+                create: [
+                    {
+                        sku: 'ACOPLAMIENTO-18-18', barcode: '9-000010',
+                        name: 'Acoplamiento 1/8 NPT-1/8 NPT', price: 11.00,
+                        stock: 100, material: 'Bronce', measureType: 'NPT',
+                        dimensions: {
+                            create: [
+                                { dimensionName: 'Lado A', dimensionValue: '1/8 NPT', measureUnit: 'NPT', displayOrder: 1 },
+                                { dimensionName: 'Lado B', dimensionValue: '1/8 NPT', measureUnit: 'NPT', displayOrder: 2 },
+                            ]
+                        }
+                    },
+                    {
+                        sku: 'ACOPLAMIENTO-14-14', barcode: '9-000020',
+                        name: 'Acoplamiento 1/4 NPT-1/4 NPT', price: 11.00,
+                        stock: 100, material: 'Bronce', measureType: 'NPT',
+                        dimensions: {
+                            create: [
+                                { dimensionName: 'Lado A', dimensionValue: '1/4 NPT', measureUnit: 'NPT', displayOrder: 1 },
+                                { dimensionName: 'Lado B', dimensionValue: '1/4 NPT', measureUnit: 'NPT', displayOrder: 2 },
+                            ]
+                        }
+                    },
+                    {
+                        sku: 'ACOPLAMIENTO-38-38', barcode: '9-000030',
+                        name: 'Acoplamiento 3/8 NPT-3/8 NPT', price: 11.00,
+                        stock: 100, material: 'Bronce', measureType: 'NPT',
+                        dimensions: {
+                            create: [
+                                { dimensionName: 'Lado A', dimensionValue: '3/8 NPT', measureUnit: 'NPT', displayOrder: 1 },
+                                { dimensionName: 'Lado B', dimensionValue: '3/8 NPT', measureUnit: 'NPT', displayOrder: 2 },
+                            ]
+                        }
+                    },
+                    {
+                        sku: 'ACOPLAMIENTO-12-12', barcode: '9-000040',
+                        name: 'Acoplamiento 1/2 NPT-1/2 NPT', price: 11.00,
+                        stock: 100, material: 'Bronce', measureType: 'NPT',
+                        dimensions: {
+                            create: [
+                                { dimensionName: 'Lado A', dimensionValue: '1/2 NPT', measureUnit: 'NPT', displayOrder: 1 },
+                                { dimensionName: 'Lado B', dimensionValue: '1/2 NPT', measureUnit: 'NPT', displayOrder: 2 },
+                            ]
+                        }
+                    },
+                    {
+                        sku: 'ACOPLAMIENTO-14-18', barcode: '9-000050',
+                        name: 'Acoplamiento 1/4 NPT-1/8 NPT', price: 11.00,
+                        stock: 100, material: 'Bronce', measureType: 'NPT',
+                        dimensions: {
+                            create: [
+                                { dimensionName: 'Lado A', dimensionValue: '1/4 NPT', measureUnit: 'NPT', displayOrder: 1 },
+                                { dimensionName: 'Lado B', dimensionValue: '1/8 NPT', measureUnit: 'NPT', displayOrder: 2 },
+                            ]
+                        }
+                    },
+                    {
+                        sku: 'ACOPLAMIENTO-18-14', barcode: '9-000060',
+                        name: 'Acoplamiento 1/8 NPT-1/4 NPT', price: 11.00,
+                        stock: 100, material: 'Bronce', measureType: 'NPT',
+                        dimensions: {
+                            create: [
+                                { dimensionName: 'Lado A', dimensionValue: '1/8 NPT', measureUnit: 'NPT', displayOrder: 1 },
+                                { dimensionName: 'Lado B', dimensionValue: '1/4 NPT', measureUnit: 'NPT', displayOrder: 2 },
+                            ]
+                        }
+                    },
+                    {
+                        sku: 'ACOPLAMIENTO-38-14', barcode: '9-000070',
+                        name: 'Acoplamiento 3/8 NPT-1/4 NPT', price: 11.00,
+                        stock: 100, material: 'Bronce', measureType: 'NPT',
+                        dimensions: {
+                            create: [
+                                { dimensionName: 'Lado A', dimensionValue: '3/8 NPT', measureUnit: 'NPT', displayOrder: 1 },
+                                { dimensionName: 'Lado B', dimensionValue: '1/4 NPT', measureUnit: 'NPT', displayOrder: 2 },
+                            ]
+                        }
+                    },
+                    {
+                        sku: 'ACOPLAMIENTO-38-12', barcode: '9-000080',
+                        name: 'Acoplamiento 3/8 NPT-1/2 NPT', price: 11.00,
+                        stock: 100, material: 'Bronce', measureType: 'NPT',
+                        dimensions: {
+                            create: [
+                                { dimensionName: 'Lado A', dimensionValue: '3/8 NPT', measureUnit: 'NPT', displayOrder: 1 },
+                                { dimensionName: 'Lado B', dimensionValue: '1/2 NPT', measureUnit: 'NPT', displayOrder: 2 },
+                            ]
+                        }
+                    },
+
+                ]
+            }
+        }
+    });
+
+    // --- NIPLE MANGUERA ---
+    await prisma.product.create({
+        data: {
+            name: 'NIPLE MANGUERA',
+            description: 'Niple manguera para union de cañeria, material bronce.',
+            price: 11.00,
+            displayOrder: 10,
+            images: {
+                create: [
+                    { url: 'https://res.cloudinary.com/dpn43zprq/image/upload/v1773404412/Captura_de_pantalla_2026-03-13_071916_bxhooy.png', isPrimary: true, order: 0 },
+                    { url: 'https://images.unsplash.com/photo-1611078564883-8a033f6a6b57?q=80&w=400', isPrimary: false, order: 1 }
+                ]
+            },
+            categoryId: catBronce.id,
+            variants: {
+                create: [
+                    {
+                        sku: 'NIPLE-MANGUERA-18-18', barcode: '10-000010',
+                        name: 'Niple manguera 1/8 NPT-1/8 ESP', price: 11.00,
+                        stock: 100, material: 'Bronce', measureType: 'NPT-ESP',
+                        dimensions: {
+                            create: [
+                                { dimensionName: 'Lado A', dimensionValue: '1/8 NPT', measureUnit: 'NPT', displayOrder: 1 },
+                                { dimensionName: 'Lado B', dimensionValue: '1/8 ESP', measureUnit: 'ESP', displayOrder: 2 },
+                            ]
+                        }
+                    },
+                    {
+                        sku: 'NIPLE-MANGUERA-14-14', barcode: '10-000020',
+                        name: 'Niple manguera 1/4 NPT-1/4 ESP', price: 11.00,
+                        stock: 100, material: 'Bronce', measureType: 'NPT-ESP',
+                        dimensions: {
+                            create: [
+                                { dimensionName: 'Lado A', dimensionValue: '1/4 NPT', measureUnit: 'NPT', displayOrder: 1 },
+                                { dimensionName: 'Lado B', dimensionValue: '1/4 ESP', measureUnit: 'ESP', displayOrder: 2 },
+                            ]
+                        }
+                    },
+                    {
+                        sku: 'NIPLE-MANGUERA-38-38', barcode: '10-000030',
+                        name: 'Niple manguera 3/8 NPT-3/8 ESP', price: 11.00,
+                        stock: 100, material: 'Bronce', measureType: 'NPT-ESP',
+                        dimensions: {
+                            create: [
+                                { dimensionName: 'Lado A', dimensionValue: '3/8 NPT', measureUnit: 'NPT', displayOrder: 1 },
+                                { dimensionName: 'Lado B', dimensionValue: '3/8 ESP', measureUnit: 'ESP', displayOrder: 2 },
+                            ]
+                        }
+                    },
+                    {
+                        sku: 'NIPLE-MANGUERA-12-12', barcode: '10-000040',
+                        name: 'Niple manguera 1/2 NPT-1/2 ESP', price: 11.00,
+                        stock: 100, material: 'Bronce', measureType: 'NPT-ESP',
+                        dimensions: {
+                            create: [
+                                { dimensionName: 'Lado A', dimensionValue: '1/2 NPT', measureUnit: 'NPT', displayOrder: 1 },
+                                { dimensionName: 'Lado B', dimensionValue: '1/2 ESP', measureUnit: 'ESP', displayOrder: 2 },
+                            ]
+                        }
+                    },
+                    {
+                        sku: 'NIPLE-MANGUERA-14-18', barcode: '10-000050',
+                        name: 'Niple manguera 1/4 NPT-1/8 ESP', price: 11.00,
+                        stock: 100, material: 'Bronce', measureType: 'NPT-ESP',
+                        dimensions: {
+                            create: [
+                                { dimensionName: 'Lado A', dimensionValue: '1/4 NPT', measureUnit: 'NPT', displayOrder: 1 },
+                                { dimensionName: 'Lado B', dimensionValue: '1/8 ESP', measureUnit: 'ESP', displayOrder: 2 },
+                            ]
+                        }
+                    },
+                    {
+                        sku: 'NIPLE-MANGUERA-18-14', barcode: '10-000060',
+                        name: 'Niple manguera 1/8 NPT-1/4 ESP', price: 11.00,
+                        stock: 100, material: 'Bronce', measureType: 'NPT-ESP',
+                        dimensions: {
+                            create: [
+                                { dimensionName: 'Lado A', dimensionValue: '1/8 NPT', measureUnit: 'NPT', displayOrder: 1 },
+                                { dimensionName: 'Lado B', dimensionValue: '1/4 ESP', measureUnit: 'ESP', displayOrder: 2 },
+                            ]
+                        }
+                    },
+                    {
+                        sku: 'NIPLE-MANGUERA-38-14', barcode: '10-000070',
+                        name: 'Niple manguera 3/8 NPT-1/4 ESP', price: 11.00,
+                        stock: 100, material: 'Bronce', measureType: 'NPT-ESP',
+                        dimensions: {
+                            create: [
+                                { dimensionName: 'Lado A', dimensionValue: '3/8 NPT', measureUnit: 'NPT', displayOrder: 1 },
+                                { dimensionName: 'Lado B', dimensionValue: '1/4 ESP', measureUnit: 'ESP', displayOrder: 2 },
+                            ]
+                        }
+                    },
+                    {
+                        sku: 'NIPLE-MANGUERA-38-12', barcode: '10-000080',
+                        name: 'Niple manguera 3/8 NPT-1/2 ESP', price: 11.00,
+                        stock: 100, material: 'Bronce', measureType: 'NPT-ESP',
+                        dimensions: {
+                            create: [
+                                { dimensionName: 'Lado A', dimensionValue: '3/8 NPT', measureUnit: 'NPT', displayOrder: 1 },
+                                { dimensionName: 'Lado B', dimensionValue: '1/2 ESP', measureUnit: 'ESP', displayOrder: 2 },
+                            ]
+                        }
+                    },
+
+                ]
+            }
+        }
+    });
+
+
     // ============================================
     // PRODUCTOS DE EMPAQUETADURAS
     // ============================================
