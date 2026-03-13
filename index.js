@@ -166,6 +166,116 @@ app.put('/api/admin/variantes/:sku', authenticateAdmin, async (req, res) => {
     }
 });
 
+// --- GESTIÓN DE CLIENTES ---
+
+app.get('/api/admin/customers', authenticateAdmin, async (req, res) => {
+    try {
+        const customers = await prisma.customer.findMany({
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json(customers);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al obtener clientes" });
+    }
+});
+
+app.post('/api/admin/customers', authenticateAdmin, async (req, res) => {
+    try {
+        const { name, company, email, phone, address, notes } = req.body;
+        const customer = await prisma.customer.create({
+            data: { name, company, email, phone, address, notes }
+        });
+        res.status(201).json(customer);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al crear cliente" });
+    }
+});
+
+app.put('/api/admin/customers/:id', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, company, email, phone, address, notes } = req.body;
+        const customer = await prisma.customer.update({
+            where: { id: parseInt(id) },
+            data: { name, company, email, phone, address, notes }
+        });
+        res.json(customer);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al actualizar cliente" });
+    }
+});
+
+// --- MOVIMIENTOS DE INVENTARIO (KARDEX) ---
+
+app.get('/api/admin/movements', authenticateAdmin, async (req, res) => {
+    try {
+        const movements = await prisma.inventoryMovement.findMany({
+            orderBy: { createdAt: 'desc' },
+            include: {
+                product: { select: { name: true } },
+                variant: { select: { sku: true } }
+            }
+        });
+        res.json(movements);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al obtener movimientos" });
+    }
+});
+
+app.post('/api/admin/movements', authenticateAdmin, async (req, res) => {
+    try {
+        const { movementType, quantity, variantId, productId, reason, reference, supplier, unitCost } = req.body;
+
+        // 1. Obtener stock actual
+        const variant = await prisma.productVariant.findUnique({
+            where: { id: parseInt(variantId) }
+        });
+
+        if (!variant) return res.status(404).json({ error: "Variante no encontrada" });
+
+        const prevStock = variant.stock;
+        let newStock = prevStock;
+
+        if (['entrada', 'ajuste', 'devolucion'].includes(movementType)) {
+            newStock += parseInt(quantity);
+        } else {
+            newStock -= parseInt(quantity);
+        }
+
+        // 2. Transacción: Actualizar stock y registrar movimiento
+        const [updatedVariant, movement] = await prisma.$transaction([
+            prisma.productVariant.update({
+                where: { id: parseInt(variantId) },
+                data: { stock: newStock }
+            }),
+            prisma.inventoryMovement.create({
+                data: {
+                    movementType,
+                    quantity: parseInt(quantity),
+                    previousStock: prevStock,
+                    resultingStock: newStock,
+                    reason,
+                    reference,
+                    supplier,
+                    unitCost: unitCost ? parseFloat(unitCost) : null,
+                    totalCost: unitCost ? parseFloat(unitCost) * parseInt(quantity) : null,
+                    productId: parseInt(productId),
+                    variantId: parseInt(variantId)
+                }
+            })
+        ]);
+
+        res.status(201).json({ success: true, movement, updatedVariant });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al registrar movimiento o actualizar stock" });
+    }
+});
+
 // Obtener todos los productos con sus categorías y variantes de medidas
 app.get('/api/productos', async (req, res) => {
     try {
@@ -260,6 +370,31 @@ app.post('/api/cotizaciones', async (req, res) => {
                 items: true
             }
         });
+
+        // Sincronización automática con el directorio de clientes
+        if (email) {
+            try {
+                await prisma.customer.upsert({
+                    where: { email: email },
+                    update: {
+                        name: contact,
+                        company: company || undefined,
+                        phone: phone || undefined,
+                        notes: `Cliente actualizado vía cotización el ${new Date().toLocaleString()}`
+                    },
+                    create: {
+                        name: contact,
+                        company: company || null,
+                        email: email,
+                        phone: phone || null,
+                        notes: `Cliente registrado automáticamente vía catálogo el ${new Date().toLocaleString()}`
+                    }
+                });
+            } catch (customerError) {
+                console.error('Error al sincronizar cliente:', customerError);
+                // No bloqueamos la respuesta de la cotización si falla el registro del cliente
+            }
+        }
 
         res.status(201).json(cotizacion);
     } catch (error) {

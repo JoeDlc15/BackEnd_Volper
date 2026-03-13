@@ -8,6 +8,8 @@ async function main() {
     console.log('Iniciando carga de datos de prueba...');
 
     // 1. Limpiar datos existentes
+    await prisma.inventoryMovement.deleteMany();
+    await prisma.customer.deleteMany();
     await prisma.variantDimension.deleteMany();
     await prisma.productVariant.deleteMany();
     await prisma.productImage.deleteMany();
@@ -59,6 +61,8 @@ async function main() {
                         name: 'Tee Union Bronce 1/2" x 1/2" x 1/4"',
                         price: 15.50,
                         stock: 50,
+                        minStock: 10,
+                        unit: 'pza',
                         material: 'Bronce',
                         measureType: 'Pulgada',
                         dimensions: {
@@ -1019,7 +1023,63 @@ async function main() {
         }
     });
 
+    // 4. Crear Clientes de prueba
+    await prisma.customer.create({
+        data: {
+            name: 'Juan Pérez',
+            company: 'Constructora Alfa',
+            email: 'juan.perez@alfa.com',
+            phone: '+51 987654321',
+            address: 'Av. Las Gardenias 456, Lima',
+            notes: 'Cliente recurrente de conexiones de bronce.'
+        }
+    });
+
+    await prisma.customer.create({
+        data: {
+            name: 'María García',
+            company: 'Mecánica Express',
+            email: 'mgarcia@mecanica.com',
+            phone: '+51 912345678',
+            address: 'Calle Los Robles 123, Arequipa',
+            notes: 'Interesada en empaquetaduras de motor.'
+        }
+    });
+
+    // 5. Crear Cotizaciones de prueba
+    await prisma.quoteRequest.create({
+        data: {
+            company: 'Constructora Alfa',
+            contact: 'Juan Pérez',
+            phone: '+51 987654321',
+            email: 'juan.perez@alfa.com',
+            status: 'pending',
+            items: {
+                create: [
+                    { productName: 'Tee Union Bronce', sku: 'TEE-BR-12-12-14', quantity: 10, price: 15.50 },
+                    { productName: 'Unión Armada', sku: 'UN-ARM-14-14', quantity: 20, price: 12.00 }
+                ]
+            }
+        }
+    });
+
+    await prisma.quoteRequest.create({
+        data: {
+            company: 'Mecánica Express',
+            contact: 'María García',
+            phone: '+51 912345678',
+            email: 'mgarcia@mecanica.com',
+            status: 'processed',
+            items: {
+                create: [
+                    { productName: 'Empaquetadura de Culata', sku: 'EMP-CUL-MET-001', quantity: 2, price: 45.00 }
+                ]
+            }
+        }
+    });
+
     console.log('Usuario administrador creado/verificado.');
+    console.log('Clientes creados.');
     console.log('Datos cargados exitosamente.');
 }
 
