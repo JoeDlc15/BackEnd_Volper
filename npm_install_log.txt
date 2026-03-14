@@ -1,0 +1,42 @@
+npm verbose cli /usr/local/bin/node /usr/local/bin/npm
+npm info using npm@10.8.2
+npm info using node@v20.20.1
+npm verbose title npm install
+npm verbose argv "install" "--loglevel" "verbose"
+npm verbose logfile logs-max:10 dir:/root/.npm/_logs/2026-03-14T11_04_56_536Z-
+npm verbose logfile /root/.npm/_logs/2026-03-14T11_04_56_536Z-debug-0.log
+npm verbose shrinkwrap failed to load node_modules/.package-lock.json out of date, updated: node_modules/prisma
+npm http fetch GET 200 https://registry.npmjs.org/npm 288ms
+npm verbose reify failed optional dependency /app/node_modules/fsevents
+npm http fetch POST 200 https://registry.npmjs.org/-/npm/v1/security/advisories/bulk 273ms
+
+> backend@1.0.0 postinstall
+> prisma generate
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma/schema.prisma
+
+Ô£ö Generated Prisma Client (v6.3.1) to ./node_modules/@prisma/client in 717ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Want real-time updates to your database without manual polling? Discover how with Pulse: https://pris.ly/tip-0-pulse
+
+
+up to date, audited 155 packages in 5s
+
+22 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+npm verbose cwd /app
+npm verbose os Linux 6.6.87.2-microsoft-standard-WSL2
+npm verbose node v20.20.1
+npm verbose npm  v10.8.2
+npm notice
+npm notice New major version of npm available! 10.8.2 -> 11.11.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.11.1
+npm notice To update run: npm install -g npm@11.11.1
+npm notice
+npm verbose exit 0
+npm info ok

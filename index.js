@@ -12,6 +12,26 @@ const AUTH_SECRET = process.env.AUTH_SECRET || 'volper_secret_2024_key';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Configuración de WebSockets (Socket.io)
+const http = require('http');
+const { Server } = require('socket.io');
+
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: '*', // Ajusta esto a tu dominio de producción
+        methods: ['GET', 'POST']
+    }
+});
+
+io.on('connection', (socket) => {
+    console.log('Nuevo cliente conectado al WebSocket:', socket.id);
+
+    socket.on('disconnect', () => {
+        console.log('Cliente desconectado:', socket.id);
+    });
+});
+
 // Middlewares
 app.use(cors({
     origin: '*', // Permitir peticiones desde cualquier origen (localtunnel, ngrok, localhost)
@@ -29,8 +49,8 @@ app.get('/', (req, res) => {
     });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Servidor HTTP y WebSocket corriendo en http://localhost:${PORT}`);
 });
 
 // Middleware de autenticación para rutas de administración
@@ -371,7 +391,7 @@ app.post('/api/cotizaciones', async (req, res) => {
             }
         });
 
-        // Sincronización automática con el directorio de clientes
+        // --- Sincronización automática con el directorio de clientes ---
         if (email) {
             try {
                 await prisma.customer.upsert({
@@ -395,6 +415,10 @@ app.post('/api/cotizaciones', async (req, res) => {
                 // No bloqueamos la respuesta de la cotización si falla el registro del cliente
             }
         }
+
+        // --- Emitir notificación en tiempo real (WebSocket) ---
+        // Emitimos la cotización recién creada (incluyendo items)
+        io.emit('new-quote', cotizacion);
 
         res.status(201).json(cotizacion);
     } catch (error) {
