@@ -62,12 +62,28 @@ const authenticateAdmin = (req, res, next) => {
 
     jwt.verify(token, AUTH_SECRET, (err, user) => {
         if (err) return res.status(403).json({ error: "Token inválido o expirado." });
+        if (user.role !== 'admin') return res.status(403).json({ error: "Acceso denegado. Se requiere rol de administrador." });
         req.user = user;
         next();
     });
 };
 
-// Rutas de Autenticación
+// Middleware de autenticación para clientes
+const authenticateCustomer = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) return res.status(401).json({ error: "Acceso denegado. Token no proporcionado." });
+
+    jwt.verify(token, AUTH_SECRET, (err, user) => {
+        if (err) return res.status(403).json({ error: "Token de cliente inválido o expirado." });
+        if (user.role !== 'customer') return res.status(403).json({ error: "Acceso denegado. Tipo de usuario incorrecto." });
+        req.user = user;
+        next();
+    });
+};
+
+// --- RUTAS DE AUTENTICACIÓN (ADMIN) ---
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -101,6 +117,164 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Error en el servidor durante el login" });
+    }
+});
+
+// --- RUTAS DE AUTENTICACIÓN (CLIENTE) ---
+app.post('/api/customer/register', async (req, res) => {
+    try {
+        const { name, email, password } = req.body;
+
+        if (!name || !email || !password) {
+            return res.status(400).json({ error: "Nombre, email y contraseña son requeridos." });
+        }
+
+        // Check if customer already exists
+        const existingCustomer = await prisma.customer.findUnique({ where: { email } });
+
+        if (existingCustomer) {
+            if (existingCustomer.password) {
+                return res.status(400).json({ error: "Ya existe un usuario con este correo electrónico." });
+            } else {
+                // The customer exists from a previous quote, but has no password (no account). We update it.
+                const hashedPassword = await bcrypt.hash(password, 10);
+                const updatedCustomer = await prisma.customer.update({
+                    where: { email },
+                    data: { name, password: hashedPassword }
+                });
+
+                const token = jwt.sign(
+                    { id: updatedCustomer.id, email: updatedCustomer.email, role: 'customer' },
+                    AUTH_SECRET,
+                    { expiresIn: '30d' }
+                );
+
+                return res.status(200).json({ token, user: { name: updatedCustomer.name, email: updatedCustomer.email } });
+            }
+        }
+
+        // Create new customer
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newCustomer = await prisma.customer.create({
+            data: { name, email, password: hashedPassword }
+        });
+
+        const token = jwt.sign(
+            { id: newCustomer.id, email: newCustomer.email, role: 'customer' },
+            AUTH_SECRET,
+            { expiresIn: '30d' }
+        );
+
+        res.status(201).json({ token, user: { name: newCustomer.name, email: newCustomer.email } });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error en el servidor durante el registro." });
+    }
+});
+
+app.post('/api/customer/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        const customer = await prisma.customer.findUnique({ where: { email } });
+
+        if (!customer || !customer.password) {
+            return res.status(401).json({ error: "Credenciales inválidas" });
+        }
+
+        const validPassword = await bcrypt.compare(password, customer.password);
+        if (!validPassword) {
+            return res.status(401).json({ error: "Credenciales inválidas" });
+        }
+
+        const token = jwt.sign(
+            { id: customer.id, email: customer.email, role: 'customer' },
+            AUTH_SECRET,
+            { expiresIn: '30d' }
+        );
+
+        res.json({
+            token,
+            user: {
+                id: customer.id,
+                name: customer.name,
+                email: customer.email,
+                company: customer.company,
+                phone: customer.phone,
+                address: customer.address
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error en el servidor durante el login" });
+    }
+});
+
+app.get('/api/customer/profile', authenticateCustomer, async (req, res) => {
+    try {
+        const customerId = req.user.id;
+        const customer = await prisma.customer.findUnique({
+            where: { id: customerId },
+            select: { id: true, name: true, email: true, company: true, phone: true, address: true, createdAt: true }
+        });
+
+        if (!customer) {
+            return res.status(404).json({ error: "Cliente no encontrado" });
+        }
+
+        res.json(customer);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al obtener perfil del cliente" });
+    }
+});
+
+app.put('/api/customer/profile', authenticateCustomer, async (req, res) => {
+    try {
+        const customerId = req.user.id;
+        const { name, company, email, phone, address } = req.body;
+
+        // El email es único. Si quiere cambiar el email, hay que validar que no exista ya en otro usuario.
+        if (email) {
+            const existing = await prisma.customer.findFirst({
+                where: { email, id: { not: customerId } }
+            });
+            if (existing) {
+                return res.status(400).json({ error: "El correo electrónico ya está en uso por otra cuenta." });
+            }
+        }
+
+        const updatedCustomer = await prisma.customer.update({
+            where: { id: customerId },
+            data: { name, company, email, phone, address },
+            select: { id: true, name: true, email: true, company: true, phone: true, address: true, createdAt: true }
+        });
+
+        res.json(updatedCustomer);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al actualizar perfil del cliente" });
+    }
+});
+
+app.get('/api/customer/quotes', authenticateCustomer, async (req, res) => {
+    try {
+        const email = req.user.email;
+        // Obtenemos las cotizaciones asociadas a este correo electrónico
+        const quotes = await prisma.quoteRequest.findMany({
+            where: { email: email },
+            orderBy: { createdAt: 'desc' },
+            include: {
+                _count: {
+                    select: { items: true }
+                }
+            }
+        });
+        res.json(quotes);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al obtener historial de cotizaciones" });
     }
 });
 

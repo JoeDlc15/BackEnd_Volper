@@ -1245,11 +1245,14 @@ async function main() {
     });
 
     // 4. Crear Clientes de prueba
+    const customerPassword = await bcrypt.hash('password123', 10);
+
     await prisma.customer.create({
         data: {
             name: 'Juan Pérez',
             company: 'Constructora Alfa',
             email: 'juan.perez@alfa.com',
+            password: customerPassword,
             phone: '+51 987654321',
             address: 'Av. Las Gardenias 456, Lima',
             notes: 'Cliente recurrente de conexiones de bronce.'
@@ -1261,6 +1264,7 @@ async function main() {
             name: 'María García',
             company: 'Mecánica Express',
             email: 'mgarcia@mecanica.com',
+            password: customerPassword,
             phone: '+51 912345678',
             address: 'Calle Los Robles 123, Arequipa',
             notes: 'Interesada en empaquetaduras de motor.'
