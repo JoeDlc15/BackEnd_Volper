@@ -9,8 +9,13 @@ const bcrypt = require('bcryptjs');
 
 const AUTH_SECRET = process.env.AUTH_SECRET || 'volper_secret_2024_key';
 
+const formatQuoteId = (id) => `COT-${String(id).padStart(5, '0')}`;
 const app = express();
 const PORT = process.env.PORT || 3000;
+const FRONTEND_URL = process.env.FRONTEND_URL || '*';
+
+// Ruta de prueba inmediata
+app.get('/api/test-debug', (req, res) => res.json({ status: 'ok', message: 'Backend actualizado' }));
 
 // Configuración de WebSockets (Socket.io)
 const http = require('http');
@@ -19,7 +24,7 @@ const { Server } = require('socket.io');
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: '*', // Ajusta esto a tu dominio de producción
+        origin: FRONTEND_URL,
         methods: ['GET', 'POST']
     }
 });
@@ -34,24 +39,11 @@ io.on('connection', (socket) => {
 
 // Middlewares
 app.use(cors({
-    origin: '*', // Permitir peticiones desde cualquier origen (localtunnel, ngrok, localhost)
+    origin: FRONTEND_URL,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'vscode-browser-req', 'Bypass-Tunnel-Reminder', 'ngrok-skip-browser-warning']
 }));
 app.use(express.json());
-
-// Ruta de prueba
-app.get('/', (req, res) => {
-    res.json({
-        mensaje: "API de Volper Seal funcionando correctamente",
-        status: "online",
-        fecha: new Date().toLocaleString()
-    });
-});
-
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor HTTP y WebSocket corriendo en http://localhost:${PORT}`);
-});
 
 // Middleware de autenticación para rutas de administración
 const authenticateAdmin = (req, res, next) => {
@@ -82,6 +74,15 @@ const authenticateCustomer = (req, res, next) => {
         next();
     });
 };
+
+// --- RUTAS PÚBLICAS ---
+app.get('/', (req, res) => {
+    res.json({
+        mensaje: "API de Volper Seal funcionando correctamente",
+        status: "online",
+        fecha: new Date().toLocaleString()
+    });
+});
 
 // --- RUTAS DE AUTENTICACIÓN (ADMIN) ---
 app.post('/api/auth/login', async (req, res) => {
@@ -129,14 +130,12 @@ app.post('/api/customer/register', async (req, res) => {
             return res.status(400).json({ error: "Nombre, email y contraseña son requeridos." });
         }
 
-        // Check if customer already exists
         const existingCustomer = await prisma.customer.findUnique({ where: { email } });
 
         if (existingCustomer) {
             if (existingCustomer.password) {
                 return res.status(400).json({ error: "Ya existe un usuario con este correo electrónico." });
             } else {
-                // The customer exists from a previous quote, but has no password (no account). We update it.
                 const hashedPassword = await bcrypt.hash(password, 10);
                 const updatedCustomer = await prisma.customer.update({
                     where: { email },
@@ -153,7 +152,6 @@ app.post('/api/customer/register', async (req, res) => {
             }
         }
 
-        // Create new customer
         const hashedPassword = await bcrypt.hash(password, 10);
         const newCustomer = await prisma.customer.create({
             data: { name, email, password: hashedPassword }
@@ -176,7 +174,6 @@ app.post('/api/customer/register', async (req, res) => {
 app.post('/api/customer/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-
         const customer = await prisma.customer.findUnique({ where: { email } });
 
         if (!customer || !customer.password) {
@@ -235,7 +232,6 @@ app.put('/api/customer/profile', authenticateCustomer, async (req, res) => {
         const customerId = req.user.id;
         const { name, company, email, phone, address } = req.body;
 
-        // El email es único. Si quiere cambiar el email, hay que validar que no exista ya en otro usuario.
         if (email) {
             const existing = await prisma.customer.findFirst({
                 where: { email, id: { not: customerId } }
@@ -258,10 +254,11 @@ app.put('/api/customer/profile', authenticateCustomer, async (req, res) => {
     }
 });
 
+// --- RUTAS DE COTIZACIONES PARA CLIENTES ---
+
 app.get('/api/customer/quotes', authenticateCustomer, async (req, res) => {
     try {
         const email = req.user.email;
-        // Obtenemos las cotizaciones asociadas a este correo electrónico
         const quotes = await prisma.quoteRequest.findMany({
             where: { email: email },
             orderBy: { createdAt: 'desc' },
@@ -271,28 +268,78 @@ app.get('/api/customer/quotes', authenticateCustomer, async (req, res) => {
                 }
             }
         });
-        res.json(quotes);
+        res.json(quotes.map(q => ({ ...q, maskId: formatQuoteId(q.id) })));
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Error al obtener historial de cotizaciones" });
     }
 });
 
-// Rutas de Administración (Protegidas)
+app.get('/api/customer/quotes/:id', authenticateCustomer, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const customerEmail = req.user.email;
+        console.log(`[DEBUG] Buscando cotización ${id} para cliente ${customerEmail}`);
+
+        const quote = await prisma.quoteRequest.findUnique({
+            where: { id: parseInt(id) },
+            include: { items: true }
+        });
+
+        if (!quote) {
+            console.log(`[DEBUG] Cotización ${id} no encontrada en la DB`);
+            return res.status(404).json({ error: "Cotización no encontrada" });
+        }
+
+        if (quote.email !== customerEmail) {
+            console.log(`[DEBUG] Acceso denegado: Cotización ${id} pertenece a ${quote.email}, no a ${customerEmail}`);
+            return res.status(403).json({ error: "No tienes permiso para ver esta cotización" });
+        }
+
+        res.json({ ...quote, maskId: formatQuoteId(quote.id) });
+    } catch (error) {
+        console.error('[SERVER ERROR]', error);
+        res.status(500).json({ error: "Error al obtener detalles de la cotización" });
+    }
+});
+
+// --- RUTAS DE ADMINISTRACIÓN (PROTEGIDAS) ---
+
 app.get('/api/admin/cotizaciones', authenticateAdmin, async (req, res) => {
     try {
         const cotizaciones = await prisma.quoteRequest.findMany({
             orderBy: { createdAt: 'desc' },
             include: {
+                items: true,
                 _count: {
                     select: { items: true }
                 }
             }
         });
-        res.json(cotizaciones);
+
+        // Enriquecer ítems con el stock actual de la variante (por SKU)
+        const enrichedCotizaciones = await Promise.all(cotizaciones.map(async (quote) => {
+            const enrichedItems = await Promise.all(quote.items.map(async (item) => {
+                const cleanSku = item.sku ? item.sku.trim() : "";
+                const variant = await prisma.productVariant.findUnique({
+                    where: { sku: cleanSku },
+                    select: { stock: true }
+                });
+                return {
+                    ...item,
+                    currentStock: variant ? variant.stock : 0
+                };
+            }));
+            return {
+                ...quote,
+                items: enrichedItems
+            };
+        }));
+
+        res.json(enrichedCotizaciones.map(q => ({ ...q, maskId: formatQuoteId(q.id) })));
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Error al obtener cotizaciones" });
+        res.status(500).json({ error: "Error al obtener cotizaciones enriquecidas" });
     }
 });
 
@@ -301,23 +348,33 @@ app.get('/api/admin/cotizaciones/:id', authenticateAdmin, async (req, res) => {
         const { id } = req.params;
         const cotizacion = await prisma.quoteRequest.findUnique({
             where: { id: parseInt(id) },
-            include: {
-                items: true
-            }
+            include: { items: true }
         });
 
         if (!cotizacion) {
             return res.status(404).json({ error: "Cotización no encontrada" });
         }
 
-        res.json(cotizacion);
+        // Enriquecer ítems con el stock actual
+        const enrichedItems = await Promise.all(cotizacion.items.map(async (item) => {
+            const cleanSku = item.sku ? item.sku.trim() : "";
+            const variant = await prisma.productVariant.findUnique({
+                where: { sku: cleanSku },
+                select: { stock: true }
+            });
+            return {
+                ...item,
+                currentStock: variant ? variant.stock : 0
+            };
+        }));
+
+        res.json({ ...cotizacion, items: enrichedItems, maskId: formatQuoteId(cotizacion.id) });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Error al obtener la cotización" });
     }
 });
 
-// Actualizar información general de un producto
 app.put('/api/admin/productos/:id', authenticateAdmin, async (req, res) => {
     try {
         const { id } = req.params;
@@ -339,7 +396,6 @@ app.put('/api/admin/productos/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
-// Actualizar información de una variante (precio, stock, etc)
 app.put('/api/admin/variantes/:sku', authenticateAdmin, async (req, res) => {
     try {
         const { sku } = req.params;
@@ -359,8 +415,6 @@ app.put('/api/admin/variantes/:sku', authenticateAdmin, async (req, res) => {
         res.status(500).json({ error: "Error al actualizar la variante" });
     }
 });
-
-// --- GESTIÓN DE CLIENTES ---
 
 app.get('/api/admin/customers', authenticateAdmin, async (req, res) => {
     try {
@@ -402,8 +456,6 @@ app.put('/api/admin/customers/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
-// --- MOVIMIENTOS DE INVENTARIO (KARDEX) ---
-
 app.get('/api/admin/movements', authenticateAdmin, async (req, res) => {
     try {
         const movements = await prisma.inventoryMovement.findMany({
@@ -424,7 +476,6 @@ app.post('/api/admin/movements', authenticateAdmin, async (req, res) => {
     try {
         const { movementType, quantity, variantId, productId, reason, reference, supplier, unitCost } = req.body;
 
-        // 1. Obtener stock actual
         const variant = await prisma.productVariant.findUnique({
             where: { id: parseInt(variantId) }
         });
@@ -440,7 +491,6 @@ app.post('/api/admin/movements', authenticateAdmin, async (req, res) => {
             newStock -= parseInt(quantity);
         }
 
-        // 2. Transacción: Actualizar stock y registrar movimiento
         const [updatedVariant, movement] = await prisma.$transaction([
             prisma.productVariant.update({
                 where: { id: parseInt(variantId) },
@@ -470,7 +520,8 @@ app.post('/api/admin/movements', authenticateAdmin, async (req, res) => {
     }
 });
 
-// Obtener todos los productos con sus categorías y variantes de medidas
+// --- RUTAS DE PRODUCTOS ---
+
 app.get('/api/productos', async (req, res) => {
     try {
         const productos = await prisma.product.findMany({
@@ -480,19 +531,11 @@ app.get('/api/productos', async (req, res) => {
                 { name: 'asc' }
             ],
             include: {
-                images: {
-                    orderBy: {
-                        order: 'asc'
-                    }
-                },
+                images: { orderBy: { order: 'asc' } },
                 category: true,
                 variants: {
                     include: {
-                        dimensions: {
-                            orderBy: {
-                                displayOrder: 'asc'
-                            }
-                        }
+                        dimensions: { orderBy: { displayOrder: 'asc' } }
                     }
                 }
             }
@@ -504,35 +547,23 @@ app.get('/api/productos', async (req, res) => {
     }
 });
 
-// Obtener un producto por ID
 app.get('/api/productos/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const producto = await prisma.product.findUnique({
             where: { id: parseInt(id) },
             include: {
-                images: {
-                    orderBy: {
-                        order: 'asc'
-                    }
-                },
+                images: { orderBy: { order: 'asc' } },
                 category: true,
                 variants: {
                     include: {
-                        dimensions: {
-                            orderBy: {
-                                displayOrder: 'asc'
-                            }
-                        }
+                        dimensions: { orderBy: { displayOrder: 'asc' } }
                     }
                 }
             }
         });
 
-        if (!producto) {
-            return res.status(404).json({ error: "Producto no encontrado" });
-        }
-
+        if (!producto) return res.status(404).json({ error: "Producto no encontrado" });
         res.json(producto);
     } catch (error) {
         console.error(error);
@@ -540,7 +571,6 @@ app.get('/api/productos/:id', async (req, res) => {
     }
 });
 
-// Crear una nueva cotización
 app.post('/api/cotizaciones', async (req, res) => {
     try {
         const { company, contact, phone, email, items } = req.body;
@@ -554,22 +584,19 @@ app.post('/api/cotizaciones', async (req, res) => {
                 items: {
                     create: items.map(item => ({
                         productName: item.name,
-                        sku: item.variants?.[0]?.sku || 'N/A',
+                        sku: (item.variants?.[0]?.sku || 'N/A').trim(),
                         quantity: item.quantity,
                         price: item.price
                     }))
                 }
             },
-            include: {
-                items: true
-            }
+            include: { items: true }
         });
 
-        // --- Sincronización automática con el directorio de clientes ---
         if (email) {
             try {
                 await prisma.customer.upsert({
-                    where: { email: email },
+                    where: { email },
                     update: {
                         name: contact,
                         company: company || undefined,
@@ -586,14 +613,10 @@ app.post('/api/cotizaciones', async (req, res) => {
                 });
             } catch (customerError) {
                 console.error('Error al sincronizar cliente:', customerError);
-                // No bloqueamos la respuesta de la cotización si falla el registro del cliente
             }
         }
 
-        // --- Emitir notificación en tiempo real (WebSocket) ---
-        // Emitimos la cotización recién creada (incluyendo items)
         io.emit('new-quote', cotizacion);
-
         res.status(201).json(cotizacion);
     } catch (error) {
         console.error(error);
@@ -601,38 +624,24 @@ app.post('/api/cotizaciones', async (req, res) => {
     }
 });
 
-// Registrar visualización única de un producto (por IP)
 app.post('/api/productos/:id/view', async (req, res) => {
     try {
         const { id } = req.params;
         const productId = parseInt(id);
+        const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.connection?.remoteAddress || '0.0.0.0';
 
-        // Obtener la IP del visitante (compatible con proxies/ngrok/localtunnel)
-        const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
-            || req.connection?.remoteAddress
-            || req.socket?.remoteAddress
-            || '0.0.0.0';
-
-        // Intentar crear el registro. Si ya existe (misma IP + producto), no hacer nada
         const existingView = await prisma.productView.findUnique({
-            where: {
-                ip_productId: { ip, productId }
-            }
+            where: { ip_productId: { ip, productId } }
         });
 
         if (!existingView) {
-            // Primera vez que este IP ve este producto → registrar y sumar 1
-            await prisma.productView.create({
-                data: { ip, productId }
-            });
-
+            await prisma.productView.create({ data: { ip, productId } });
             await prisma.product.update({
                 where: { id: productId },
                 data: { viewCount: { increment: 1 } }
             });
         }
 
-        // Devolver el conteo actualizado
         const product = await prisma.product.findUnique({
             where: { id: productId },
             select: { viewCount: true }
@@ -643,4 +652,9 @@ app.post('/api/productos/:id/view', async (req, res) => {
         console.error('Error registrando vista:', error);
         res.status(500).json({ error: "Error al registrar la visualización" });
     }
+});
+
+// --- INICIAR SERVIDOR ---
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Servidor HTTP y WebSocket corriendo en http://localhost:${PORT}`);
 });

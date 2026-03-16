@@ -43,7 +43,6 @@ async function main() {
         data: {
             name: 'Tee Union Bronce',
             description: 'Tee de bronce forjado para alta presión.',
-            price: 15.50,
             displayOrder: 1,
             images: {
                 create: [
@@ -99,7 +98,6 @@ async function main() {
         data: {
             name: 'Unión Armada',
             description: 'Unión para conexiones hidráulicas.',
-            price: 22.80,
             displayOrder: 2,
             images: {
                 create: [
@@ -253,7 +251,6 @@ async function main() {
         data: {
             name: 'Unión Armada Mixta',
             description: 'Unión para conexiones hidráulicas con medidas diferentes en cada extremo.',
-            price: 15.90,
             displayOrder: 3,
             images: {
                 create: [
@@ -307,7 +304,6 @@ async function main() {
         data: {
             name: 'Cono Bronce',
             description: 'Cono para tubo de cobre, material bronce.',
-            price: 5.90,
             displayOrder: 4,
             images: {
                 create: [
@@ -428,7 +424,6 @@ async function main() {
         data: {
             name: 'Guia o Clavija',
             description: 'Guia de bronce',
-            price: 5.90,
             displayOrder: 5,
             images: {
                 create: [
@@ -549,7 +544,6 @@ async function main() {
         data: {
             name: 'Tuerca Union Cañeria',
             description: 'Tuerca para union de cañeria, material bronce.',
-            price: 5.90,
             displayOrder: 6,
             images: {
                 create: [
@@ -670,7 +664,6 @@ async function main() {
         data: {
             name: 'Contratuerca Hilo Fino',
             description: 'Contratuerca para union de cañeria, material bronce.',
-            price: 5.90,
             displayOrder: 7,
             images: {
                 create: [
@@ -751,7 +744,6 @@ async function main() {
         data: {
             name: 'Contratuerca Milimetrica c/ Asiento Oring',
             description: 'Contratuerca para union de cañeria, material bronce.',
-            price: 11.00,
             displayOrder: 8,
             images: {
                 create: [
@@ -822,7 +814,6 @@ async function main() {
         data: {
             name: 'CONECTOR RECTO ARMADO',
             description: 'Conector recto armado para union de cañeria, material bronce.',
-            price: 11.00,
             displayOrder: 9,
             images: {
                 create: [
@@ -932,7 +923,6 @@ async function main() {
         data: {
             name: 'ACOPLAMIENTO MACHO',
             description: 'Acoplamiento macho para union de cañeria, material bronce.',
-            price: 11.00,
             displayOrder: 10,
             images: {
                 create: [
@@ -1042,7 +1032,6 @@ async function main() {
         data: {
             name: 'NIPLE MANGUERA',
             description: 'Niple manguera para union de cañeria, material bronce.',
-            price: 11.00,
             displayOrder: 10,
             images: {
                 create: [
@@ -1156,7 +1145,6 @@ async function main() {
         data: {
             name: 'Empaquetadura de Culata',
             description: 'Sello de alta resistencia para bloque de motor.',
-            price: 45.00,
             displayOrder: 1,
             images: {
                 create: [
@@ -1196,7 +1184,6 @@ async function main() {
         data: {
             name: 'Arandela de Sello Motor',
             description: 'Arandelas técnicas para evitar fugas de aceite.',
-            price: 0.80,
             displayOrder: 2,
             images: {
                 create: [

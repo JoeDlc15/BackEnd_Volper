@@ -18,9 +18,8 @@ model Category {
 
 model Product {
   id           Int                 @id @default(autoincrement())
-  name         String              @db.VarChar(150)
+  name         String              @unique @db.VarChar(150)
   description  String?
-  price        Decimal             @default(0.0) @db.Decimal(10, 2)
   viewCount    Int                 @default(0)
   displayOrder Int                 @default(999)
   categoryId   Int

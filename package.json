@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "npx prisma generate && nodemon index.js",
-    "build": "prisma generate && tsc",
+    "build": "prisma generate",
+    "db-import": "node prisma/import.js",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -18,7 +19,8 @@
     "express": "^4.18.3",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.11.3",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.0",
