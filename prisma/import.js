@@ -56,7 +56,7 @@ async function importData() {
                     });
                 }
 
-                // 2. Manejamos la VARIANTE (SKU) con Upsert
+                // 2. Manejamos la VARIANTE (SKU)
                 const variantData = {
                     name: row.nombreVariant ? String(row.nombreVariant).trim() : null,
                     price: parseFloat(row.precio_var) || 0,
@@ -65,32 +65,76 @@ async function importData() {
                     material: row.material || 'Bronce',
                     measureType: row.measureType || 'Pulgada',
                     productId: product.id
-                    // minStock se queda con el default del modelo si no se pasa
                 };
 
-                await prisma.productVariant.upsert({
-                    where: { sku: sku },
-                    update: {
-                        name: variantData.name,
-                        price: variantData.price,
-                        stock: variantData.stock,
-                        barcode: variantData.barcode
-                    },
-                    create: {
-                        sku: sku,
-                        ...variantData,
-                        minStock: parseInt(row.min_stock) || 5,
-                        dimensions: {
-                            create: [
-                                ...(row.dim1_n ? [{ dimensionName: row.dim1_n, dimensionValue: String(row.dim1_v), displayOrder: 1 }] : []),
-                                ...(row.dim2_n ? [{ dimensionName: row.dim2_n, dimensionValue: String(row.dim2_v), displayOrder: 2 }] : []),
-                                ...(row.dim3_n ? [{ dimensionName: row.dim3_n, dimensionValue: String(row.dim3_v), displayOrder: 3 }] : []),
-                            ]
-                        }
-                    }
+                const existingVariant = await prisma.productVariant.findUnique({
+                    where: { sku: sku }
                 });
 
-                console.log(`   ✅ SKU PROCESADO: ${sku}`);
+                if (!existingVariant) {
+                    // CREAR NUEVA VARIANTE CON MOVIMIENTO INICIAL
+                    await prisma.$transaction(async (tx) => {
+                        const newVariant = await tx.productVariant.create({
+                            data: {
+                                sku: sku,
+                                ...variantData,
+                                minStock: parseInt(row.min_stock) || 5,
+                                dimensions: {
+                                    create: [
+                                        ...(row.dim1_n ? [{ dimensionName: row.dim1_n, dimensionValue: String(row.dim1_v), displayOrder: 1 }] : []),
+                                        ...(row.dim2_n ? [{ dimensionName: row.dim2_n, dimensionValue: String(row.dim2_v), displayOrder: 2 }] : []),
+                                        ...(row.dim3_n ? [{ dimensionName: row.dim3_n, dimensionValue: String(row.dim3_v), displayOrder: 3 }] : []),
+                                    ]
+                                }
+                            }
+                        });
+
+                        await tx.inventoryMovement.create({
+                            data: {
+                                movementType: 'entrada',
+                                quantity: variantData.stock,
+                                previousStock: 0,
+                                resultingStock: variantData.stock,
+                                reason: 'Carga inicial por importación',
+                                reference: 'IMPORT-EXCEL',
+                                productId: product.id,
+                                variantId: newVariant.id
+                            }
+                        });
+                    });
+                    console.log(`   ✅ SKU CREADO (Con Movimiento): ${sku}`);
+                } else {
+                    // ACTUALIZAR VARIANTE Y REGISTRAR AJUSTE SI CAMBIA EL STOCK
+                    const stockDiff = variantData.stock - existingVariant.stock;
+
+                    await prisma.$transaction(async (tx) => {
+                        await tx.productVariant.update({
+                            where: { sku: sku },
+                            data: {
+                                name: variantData.name,
+                                price: variantData.price,
+                                stock: variantData.stock,
+                                barcode: variantData.barcode
+                            }
+                        });
+
+                        if (stockDiff !== 0) {
+                            await tx.inventoryMovement.create({
+                                data: {
+                                    movementType: 'ajuste',
+                                    quantity: Math.abs(stockDiff),
+                                    previousStock: existingVariant.stock,
+                                    resultingStock: variantData.stock,
+                                    reason: 'Actualización por importación',
+                                    reference: 'IMPORT-EXCEL',
+                                    productId: product.id,
+                                    variantId: existingVariant.id
+                                }
+                            });
+                        }
+                    });
+                    console.log(`   ✅ SKU ACTUALIZADO: ${sku} ${stockDiff !== 0 ? '(Ajuste stock: ' + stockDiff + ')' : ''}`);
+                }
 
             } catch (rowError) {
                 console.error(`❌ Error en fila ${index + 2} (${nombre}):`, rowError.message);

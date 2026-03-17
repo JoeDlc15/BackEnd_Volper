@@ -6,6 +6,10 @@ const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const multer = require('multer');
+const xlsx = require('xlsx');
+const path = require('path');
+const fs = require('fs');
 
 const AUTH_SECRET = process.env.AUTH_SECRET || 'volper_secret_2024_key';
 
@@ -13,6 +17,9 @@ const formatQuoteId = (id) => `COT-${String(id).padStart(5, '0')}`;
 const app = express();
 const PORT = process.env.PORT || 3000;
 const FRONTEND_URL = process.env.FRONTEND_URL || '*';
+
+// Configuración de Multer para gestión de archivos temporales
+const upload = multer({ dest: 'uploads/' });
 
 // Ruta de prueba inmediata
 app.get('/api/test-debug', (req, res) => res.json({ status: 'ok', message: 'Backend actualizado' }));
@@ -401,15 +408,49 @@ app.put('/api/admin/variantes/:sku', authenticateAdmin, async (req, res) => {
         const { sku } = req.params;
         const { price, stock } = req.body;
 
-        const variante = await prisma.productVariant.update({
-            where: { sku },
-            data: {
-                price: price !== undefined ? parseFloat(price) : undefined,
-                stock: stock !== undefined ? parseInt(stock) : undefined
-            }
+        const currentVariant = await prisma.productVariant.findUnique({
+            where: { sku }
         });
 
-        res.json(variante);
+        if (!currentVariant) return res.status(404).json({ error: "Variante no encontrada" });
+
+        const dataToUpdate = {};
+        if (price !== undefined) dataToUpdate.price = parseFloat(price);
+
+        let movement = null;
+        if (stock !== undefined) {
+            const newStock = parseInt(stock);
+            const diff = newStock - currentVariant.stock;
+
+            if (diff !== 0) {
+                dataToUpdate.stock = newStock;
+                // Generar movimiento de ajuste automático
+                movement = {
+                    movementType: 'ajuste',
+                    quantity: Math.abs(diff),
+                    previousStock: currentVariant.stock,
+                    resultingStock: newStock,
+                    reason: diff > 0 ? "Ajuste manual (Incremento)" : "Ajuste manual (Decremento)",
+                    reference: "ADJ-MANUAL",
+                    productId: currentVariant.productId,
+                    variantId: currentVariant.id
+                };
+            }
+        }
+
+        const result = await prisma.$transaction(async (tx) => {
+            const updated = await tx.productVariant.update({
+                where: { sku },
+                data: dataToUpdate
+            });
+
+            if (movement) {
+                await tx.inventoryMovement.create({ data: movement });
+            }
+            return updated;
+        });
+
+        res.json(result);
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Error al actualizar la variante" });
@@ -456,6 +497,105 @@ app.put('/api/admin/customers/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
+// --- GESTIÓN DE CATEGORÍAS ---
+
+app.get('/api/admin/categories', authenticateAdmin, async (req, res) => {
+    try {
+        const categories = await prisma.category.findMany({
+            orderBy: { displayOrder: 'asc' },
+            include: {
+                _count: {
+                    select: { products: true }
+                }
+            }
+        });
+        res.json(categories);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al obtener categorías" });
+    }
+});
+
+app.post('/api/admin/categories', authenticateAdmin, async (req, res) => {
+    try {
+        const { name, description, displayOrder } = req.body;
+        const slug = name.toLowerCase()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
+            .replace(/[^\w\s-]/g, '')
+            .replace(/[\s_-]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+
+        const category = await prisma.category.create({
+            data: {
+                name,
+                slug,
+                description,
+                displayOrder: displayOrder ? parseInt(displayOrder) : undefined
+            }
+        });
+        res.status(201).json(category);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al crear categoría" });
+    }
+});
+
+app.put('/api/admin/categories/:id', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, description, displayOrder } = req.body;
+
+        const data = {
+            name,
+            description,
+            displayOrder: displayOrder ? parseInt(displayOrder) : undefined
+        };
+
+        if (name) {
+            data.slug = name.toLowerCase()
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^\w\s-]/g, '')
+                .replace(/[\s_-]+/g, '-')
+                .replace(/^-+|-+$/g, '');
+        }
+
+        const category = await prisma.category.update({
+            where: { id: parseInt(id) },
+            data
+        });
+        res.json(category);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al actualizar categoría" });
+    }
+});
+
+app.delete('/api/admin/categories/:id', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const categoryId = parseInt(id);
+
+        const productsCount = await prisma.product.count({
+            where: { categoryId }
+        });
+
+        if (productsCount > 0) {
+            return res.status(400).json({
+                error: "No se puede eliminar la categoría porque tiene productos asociados. Debe mover o eliminar los productos primero."
+            });
+        }
+
+        await prisma.category.delete({
+            where: { id: categoryId }
+        });
+
+        res.json({ success: true, message: "Categoría eliminada correctamente" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al eliminar categoría" });
+    }
+});
+
 app.get('/api/admin/movements', authenticateAdmin, async (req, res) => {
     try {
         const movements = await prisma.inventoryMovement.findMany({
@@ -483,12 +623,21 @@ app.post('/api/admin/movements', authenticateAdmin, async (req, res) => {
         if (!variant) return res.status(404).json({ error: "Variante no encontrada" });
 
         const prevStock = variant.stock;
+        const absQuantity = Math.abs(parseInt(quantity));
         let newStock = prevStock;
+        let finalQuantityToStore = absQuantity;
 
-        if (['entrada', 'ajuste', 'devolucion'].includes(movementType)) {
-            newStock += parseInt(quantity);
-        } else {
-            newStock -= parseInt(quantity);
+        // Lógica de Stock: El tipo decide si suma o resta
+        if (['entrada', 'devolucion', 'ajuste_positivo'].includes(movementType)) {
+            newStock += absQuantity;
+            finalQuantityToStore = absQuantity;
+        } else if (['salida', 'merma', 'ajuste_negativo'].includes(movementType)) {
+            newStock -= absQuantity;
+            finalQuantityToStore = -absQuantity; // Se guarda negativo para el historial
+        } else if (movementType === 'ajuste') {
+            const rawQty = parseInt(quantity);
+            newStock += rawQty;
+            finalQuantityToStore = rawQty;
         }
 
         const [updatedVariant, movement] = await prisma.$transaction([
@@ -499,14 +648,14 @@ app.post('/api/admin/movements', authenticateAdmin, async (req, res) => {
             prisma.inventoryMovement.create({
                 data: {
                     movementType,
-                    quantity: parseInt(quantity),
+                    quantity: finalQuantityToStore,
                     previousStock: prevStock,
                     resultingStock: newStock,
                     reason,
                     reference,
                     supplier,
                     unitCost: unitCost ? parseFloat(unitCost) : null,
-                    totalCost: unitCost ? parseFloat(unitCost) * parseInt(quantity) : null,
+                    totalCost: unitCost ? parseFloat(unitCost) * absQuantity : null,
                     productId: parseInt(productId),
                     variantId: parseInt(variantId)
                 }
@@ -563,11 +712,161 @@ app.get('/api/productos/:id', async (req, res) => {
             }
         });
 
-        if (!producto) return res.status(404).json({ error: "Producto no encontrado" });
+        if (!producto) {
+            return res.status(404).json({ error: "Producto no encontrado" });
+        }
+
         res.json(producto);
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Error al obtener el producto" });
+    }
+});
+
+// --- IMPORTACIÓN MASIVA ---
+app.post('/api/admin/products/import', authenticateAdmin, upload.single('file'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No se ha subido ningún archivo' });
+    }
+
+    const filePath = req.file.path;
+    const stats = { created: 0, updated: 0, skipped: 0, errors: [] };
+
+    try {
+        const workbook = xlsx.readFile(filePath);
+        const sheetName = workbook.SheetNames[0];
+        const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+        for (const [index, row] of data.entries()) {
+            const nombre = row.nombre ? String(row.nombre).trim() : null;
+            const sku = row.sku ? String(row.sku).trim() : null;
+
+            if (!nombre || !sku) {
+                stats.skipped++;
+                continue;
+            }
+
+            try {
+                // 1. Buscamos o creamos el producto base
+                let product = await prisma.product.findFirst({
+                    where: { name: nombre }
+                });
+
+                if (!product) {
+                    product = await prisma.product.create({
+                        data: {
+                            name: nombre,
+                            description: row.descripcion || '',
+                            categoryId: parseInt(row.cat_id) || 1,
+                            images: {
+                                create: row.img_urls ? row.img_urls.split(',').map((url, i) => ({
+                                    url: url.trim(), isPrimary: i === 0, order: i
+                                })) : []
+                            }
+                        }
+                    });
+                    stats.created++;
+                } else {
+                    await prisma.product.update({
+                        where: { id: product.id },
+                        data: {
+                            description: row.descripcion || product.description,
+                            categoryId: parseInt(row.cat_id) || product.categoryId
+                        }
+                    });
+                }
+
+                // 2. Manejamos la VARIANTE (SKU)
+                const variantData = {
+                    name: row.nombreVariant ? String(row.nombreVariant).trim() : null,
+                    price: parseFloat(row.precio_var) || 0,
+                    stock: parseInt(row.stock) || 0,
+                    barcode: row.barcode ? String(row.barcode).trim() : '',
+                    material: row.material || 'Bronce',
+                    measureType: row.measureType || 'Pulgada',
+                    productId: product.id
+                };
+
+                const existingVariant = await prisma.productVariant.findUnique({
+                    where: { sku: sku }
+                });
+
+                if (!existingVariant) {
+                    await prisma.$transaction(async (tx) => {
+                        const newVariant = await tx.productVariant.create({
+                            data: {
+                                sku: sku,
+                                ...variantData,
+                                minStock: parseInt(row.min_stock) || 5,
+                                dimensions: {
+                                    create: [
+                                        ...(row.dim1_n ? [{ dimensionName: row.dim1_n, dimensionValue: String(row.dim1_v), displayOrder: 1 }] : []),
+                                        ...(row.dim2_n ? [{ dimensionName: row.dim2_n, dimensionValue: String(row.dim2_v), displayOrder: 2 }] : []),
+                                        ...(row.dim3_n ? [{ dimensionName: row.dim3_n, dimensionValue: String(row.dim3_v), displayOrder: 3 }] : []),
+                                    ]
+                                }
+                            }
+                        });
+
+                        await tx.inventoryMovement.create({
+                            data: {
+                                movementType: 'entrada',
+                                quantity: variantData.stock,
+                                previousStock: 0,
+                                resultingStock: variantData.stock,
+                                reason: 'Carga inicial por importación (Dashboard)',
+                                reference: 'IMPORT-DASH',
+                                productId: product.id,
+                                variantId: newVariant.id
+                            }
+                        });
+                    });
+                } else {
+                    const stockDiff = variantData.stock - existingVariant.stock;
+                    await prisma.$transaction(async (tx) => {
+                        await tx.productVariant.update({
+                            where: { sku: sku },
+                            data: {
+                                name: variantData.name,
+                                price: variantData.price,
+                                stock: variantData.stock,
+                                barcode: variantData.barcode
+                            }
+                        });
+
+                        if (stockDiff !== 0) {
+                            await tx.inventoryMovement.create({
+                                data: {
+                                    movementType: 'ajuste',
+                                    quantity: Math.abs(stockDiff),
+                                    previousStock: existingVariant.stock,
+                                    resultingStock: variantData.stock,
+                                    reason: 'Actualización por importación (Dashboard)',
+                                    reference: 'IMPORT-DASH',
+                                    productId: product.id,
+                                    variantId: existingVariant.id
+                                }
+                            });
+                        }
+                    });
+                    stats.updated++;
+                }
+            } catch (rowError) {
+                stats.errors.push(`Fila ${index + 2}: ${rowError.message}`);
+                console.error(`Error en fila ${index + 2}:`, rowError);
+            }
+        }
+
+        res.json({ success: true, stats });
+
+    } catch (error) {
+        console.error('Error crítico en importación:', error);
+        res.status(500).json({ error: 'Error del servidor al procesar el archivo' });
+    } finally {
+        // Limpiar archivo temporal
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
     }
 });
 

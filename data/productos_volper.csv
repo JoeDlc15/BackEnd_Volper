@@ -1,0 +1,26 @@
+nombre;descripcion;cat_id;img_urls;sku;barcode;nombreVariant;precio_var;stock;min_stock;material;measureType;dim1_n;dim1_v;dim2_n;dim2_v;dim3_n;dim3_v
+CONECTOR CODO ARMADO 45° GRADOS;Codo Union en Broncee forjado para alta presión.;1;https://res.cloudinary.com/dpn43zprq/image/upload/v1773662621/Codo45_mcpw4z.png;CO-CO-45-14-18;55-040002;Conector Codo Armado 45° - ø 1/4 x 3/8 NPT;5;100;10;Bronce;Pulgada;Lado A;ø 1/4;Lado B;1/8 NPT;;
+CONECTOR CODO ARMADO 45° GRADOS;;1;;CO-CO-45-14-14;55-040004;Conector Codo Armado 45° - ø  1/4 x 1/4 NPT;6;100;10;Bronce;Pulgada;Lado A;ø 1/4;Lado B;1/4 NPT;;
+CONECTOR CODO ARMADO 45° GRADOS;;1;;CO-CO-45-14-38;55-040006;Conector Codo Armado 45° - ø  1/4 x 3/8 NPT;7;100;10;Bronce;Pulgada;Lado A;ø 1/4;Lado B;3/8 NPT;;
+CONECTOR CODO ARMADO 45° GRADOS;;1;;CO-CO-45-516-18;55-050002;Conector Codo Armado 45° - ø 5/16 x 1/8 NPT;8;100;10;Bronce;Pulgada;Lado A;ø 5/16;Lado B;1/8 NPT;;
+CONECTOR CODO ARMADO 45° GRADOS;;1;;CO-CO-45-38-18;55-060002;Conector Codo Armado 45° - ø 3/8 x 1/8 NPT;9;100;10;Bronce;Pulgada;Lado A;ø 3/8;Lado B;1/8 NPT;;
+CONECTOR CODO ARMADO 45° GRADOS;;1;;CO-CO-45-38-14;55-060004;Conector Codo Armado 45° - ø 3/8 x 1/4 NPT;10;100;10;Bronce;Pulgada;Lado A;ø 3/8;Lado B;1/4 NPT;;
+CONECTOR CODO ARMADO 45° GRADOS;;1;;CO-CO-45-38-38;55-060006;Conector Codo Armado 45° - ø 3/8 x 3/8 NPT;10.5;100;10;Bronce;Pulgada;Lado A;ø 3/8;Lado B;3/8 NPT;;
+Tee Union Bronce;Tee de bronce forjado para alta presión.;1;;TEE-BR-532;16-020202;Tee union Armada ø 5/32;5;100;10;Bronce;Pulgada;lados;ø 5/32;;;;
+Tee Union Bronce;;1;;TEE-BR-316;16-030303;Tee union Armada ø 3/16;6;100;10;Bronce;Pulgada;lados;ø 3/16;;;;
+Tee Union Bronce;;1;;TEE-BR-14;16-040404;Tee union Armada ø 1/4;7;100;10;Bronce;Pulgada;lados;ø 1/4;;;;
+Tee Union Bronce;;1;;TEE-BR-516;16-050505;Tee union Armada ø 5/16;8;100;10;Bronce;Pulgada;lados;ø 5/16;;;;
+Tee Union Bronce;;1;;TEE-BR-38;16-060606;Tee union Armada ø 3/8;9;100;10;Bronce;Pulgada;lados;ø 3/8;;;;
+Tee Union Bronce;;1;;TEE-BR-12;16-080808;Tee union Armada ø 1/2;10;100;10;Bronce;Pulgada;lados;ø 1/2;;;;
+Tee Union Bronce;;1;;TEE-BR-58;16-101010;Tee union Armada ø 5/8;10.5;100;10;Bronce;Pulgada;lados;ø 5/8;;;;
+Tee Union Bronce;;1;;TEE-BR-M6;16-000603;Tee union Armada ø M6;5.5;100;10;Bronce;Milimetrico;lados;M6;;;;
+Tee Union Bronce;;1;;TEE-BR-M8;16-000803;Tee union Armada ø M8;6.5;100;10;Bronce;Milimetrico;lados;M8;;;;
+Tee Union Bronce;;1;;TEE-BR-M10;16-001003;Tee union Armada ø M10;7.3;100;10;Bronce;Milimetrico;lados;M10;;;;
+Tee Union Bronce;;1;;TEE-BR-M12;16-001203;Tee union Armada ø M12;8.4;100;10;Bronce;Milimetrico;lados;M12;;;;
+Codo Union Armada;Codo Union en Broncee forjado para alta presión.;1;https://res.cloudinary.com/dpn43zprq/image/upload/v1773660000/Codo_Union_cnqlfa.png;CO-UN-532;19-025025;Codo ø5/32;5;100;10;Bronce;Pulgada;lados;ø 5/32;;;;
+Codo Union Armada;;1;;CO-UN-316;19-030030;Codo ø3/16;6;100;10;Bronce;Pulgada;lados;ø 3/16;;;;
+Codo Union Armada;;1;;CO-UN-14;19-040040;Codo ø1/4;7;100;10;Bronce;Pulgada;lados;ø 1/4;;;;
+Codo Union Armada;;1;;CO-UN-516;19-050050;Codo ø5/16;8;100;10;Bronce;Pulgada;lados;ø 5/16;;;;
+Codo Union Armada;;1;;CO-UN-38;19-060060;Codo ø3/8;9;100;10;Bronce;Pulgada;lados;ø 3/8;;;;
+Codo Union Armada;;1;;CO-UN-12;19-080080;Codo ø1/2;10;100;10;Bronce;Pulgada;lados;ø 1/2;;;;
+Codo Union Armada;;1;;CO-UN-58;19-100100;Codo ø5/8;10.5;100;10;Bronce;Pulgada;lados;ø 5/8;;;;
