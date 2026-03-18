@@ -596,6 +596,154 @@ app.delete('/api/admin/categories/:id', authenticateAdmin, async (req, res) => {
     }
 });
 
+// --- GESTIÓN DE PRODUCTOS ---
+
+app.post('/api/admin/products', authenticateAdmin, async (req, res) => {
+    try {
+        const { name, description, categoryId, displayOrder, initialVariant } = req.body;
+
+        const product = await prisma.product.create({
+            data: {
+                name,
+                description,
+                categoryId: parseInt(categoryId),
+                displayOrder: displayOrder ? parseInt(displayOrder) : undefined,
+                variants: initialVariant ? {
+                    create: {
+                        sku: initialVariant.sku,
+                        name: initialVariant.name || name,
+                        price: parseFloat(initialVariant.price),
+                        stock: parseInt(initialVariant.stock),
+                        unit: initialVariant.unit || 'pza'
+                    }
+                } : undefined
+            },
+            include: { variants: true }
+        });
+
+        // Registrar movimiento inicial de stock si hay variante
+        if (initialVariant && initialVariant.stock > 0) {
+            await prisma.inventoryMovement.create({
+                data: {
+                    movementType: 'ENTRADA',
+                    quantity: parseInt(initialVariant.stock),
+                    previousStock: 0,
+                    resultingStock: parseInt(initialVariant.stock),
+                    reason: 'Carga inicial de producto nuevo',
+                    productId: product.id,
+                    variantId: product.variants[0].id
+                }
+            });
+        }
+
+        res.status(201).json(product);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al crear producto. Verifique que el nombre no esté duplicado." });
+    }
+});
+
+app.put('/api/admin/products/:id', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, description, categoryId, displayOrder } = req.body;
+
+        const product = await prisma.product.update({
+            where: { id: parseInt(id) },
+            data: {
+                name,
+                description,
+                categoryId: categoryId ? parseInt(categoryId) : undefined,
+                displayOrder: displayOrder ? parseInt(displayOrder) : undefined
+            }
+        });
+        res.json(product);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al actualizar producto" });
+    }
+});
+
+app.delete('/api/admin/products/:id', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const productId = parseInt(id);
+
+        // Gracias a onDelete: Cascade en schema.prisma, el borrado de 
+        // movimientos, vistas, imágenes y variantes se hace automáticamente.
+        await prisma.product.delete({ where: { id: productId } });
+
+        res.json({ success: true, message: "Producto eliminado correctamente" });
+
+        res.json({ success: true, message: "Producto eliminado correctamente" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al eliminar producto" });
+    }
+});
+
+// --- GESTIÓN DE VARIANTES ---
+
+app.post('/api/admin/products/:id/variants', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { sku, name, price, stock, unit, minStock, barcode } = req.body;
+
+        const variant = await prisma.productVariant.create({
+            data: {
+                sku,
+                name,
+                price: parseFloat(price),
+                stock: parseInt(stock),
+                unit,
+                minStock: minStock ? parseInt(minStock) : undefined,
+                barcode,
+                productId: parseInt(id)
+            }
+        });
+
+        // Registrar movimiento inicial de stock
+        if (stock > 0) {
+            await prisma.inventoryMovement.create({
+                data: {
+                    movementType: 'ENTRADA',
+                    quantity: parseInt(stock),
+                    previousStock: 0,
+                    resultingStock: parseInt(stock),
+                    reason: 'Carga inicial de variante',
+                    productId: parseInt(id),
+                    variantId: variant.id
+                }
+            });
+        }
+
+        res.status(201).json(variant);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al crear variante. Verifique que el SKU no esté duplicado." });
+    }
+});
+
+app.delete('/api/admin/variants/:sku', authenticateAdmin, async (req, res) => {
+    try {
+        const { sku } = req.params;
+        const variant = await prisma.productVariant.findUnique({
+            where: { sku }
+        });
+
+        if (!variant) return res.status(404).json({ error: "Variante no encontrada" });
+
+        // Gracias a onDelete: Cascade en schema.prisma, el borrado de 
+        // dimensiones y movimientos se hace automáticamente.
+        await prisma.productVariant.delete({ where: { sku } });
+
+        res.json({ success: true, message: "Variante eliminada correctamente" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al eliminar variante" });
+    }
+});
+
 app.get('/api/admin/movements', authenticateAdmin, async (req, res) => {
     try {
         const movements = await prisma.inventoryMovement.findMany({
@@ -872,10 +1020,18 @@ app.post('/api/admin/products/import', authenticateAdmin, upload.single('file'),
 
 app.post('/api/cotizaciones', async (req, res) => {
     try {
-        const { company, contact, phone, email, items } = req.body;
+        const { company, contact, phone, email, items, customerId } = req.body;
+
+        // Intentar vincular con cliente existente por ID o Email
+        let linkedCustomerId = customerId;
+        if (!linkedCustomerId && email) {
+            const customer = await prisma.customer.findUnique({ where: { email } });
+            if (customer) linkedCustomerId = customer.id;
+        }
 
         const cotizacion = await prisma.quoteRequest.create({
             data: {
+                customerId: linkedCustomerId,
                 company,
                 contact,
                 phone,
@@ -892,6 +1048,7 @@ app.post('/api/cotizaciones', async (req, res) => {
             include: { items: true }
         });
 
+        // Sincronizar/Upsert datos del cliente
         if (email) {
             try {
                 await prisma.customer.upsert({
@@ -900,14 +1057,14 @@ app.post('/api/cotizaciones', async (req, res) => {
                         name: contact,
                         company: company || undefined,
                         phone: phone || undefined,
-                        notes: `Cliente actualizado vía cotización el ${new Date().toLocaleString()}`
+                        notes: `Última cotización vinculada el ${new Date().toLocaleString()}`
                     },
                     create: {
                         name: contact,
                         company: company || null,
                         email: email,
                         phone: phone || null,
-                        notes: `Cliente registrado automáticamente vía catálogo el ${new Date().toLocaleString()}`
+                        notes: `Cliente registrado automáticamente el ${new Date().toLocaleString()}`
                     }
                 });
             } catch (customerError) {
