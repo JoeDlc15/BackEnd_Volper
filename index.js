@@ -10,6 +10,8 @@ const multer = require('multer');
 const xlsx = require('xlsx');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 const AUTH_SECRET = process.env.AUTH_SECRET || 'volper_secret_2024_key';
 
@@ -27,6 +29,42 @@ app.get('/api/test-debug', (req, res) => res.json({ status: 'ok', message: 'Back
 // Configuración de WebSockets (Socket.io)
 const http = require('http');
 const { Server } = require('socket.io');
+
+// Configuración de Email Transporter
+const transporter = nodemailer.createTransport({
+    host: process.env.MAIL_HOST || 'smtp.gmail.com',
+    port: process.env.MAIL_PORT || 587,
+    secure: false, // true para 465, false para otros puertos
+    auth: {
+        user: process.env.MAIL_USER,
+        pass: process.env.MAIL_PASS,
+    },
+});
+
+const sendEmail = async (options) => {
+    try {
+        if (!process.env.MAIL_USER || !process.env.MAIL_PASS) {
+            console.warn('⚠️ Credenciales de correo no configuradas. Simulando envío...');
+            console.log('--- EMAIL SIMULADO ---');
+            console.log('Para:', options.to);
+            console.log('Asunto:', options.subject);
+            console.log('Mensaje:', options.text);
+            console.log('-----------------------');
+            return true;
+        }
+        await transporter.sendMail({
+            from: process.env.MAIL_FROM || '"Soporte" <no-reply@example.com>',
+            to: options.to,
+            subject: options.subject,
+            text: options.text,
+            html: options.html,
+        });
+        return true;
+    } catch (error) {
+        console.error('Error enviando email:', error);
+        return false;
+    }
+};
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -212,6 +250,97 @@ app.post('/api/customer/login', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Error en el servidor durante el login" });
+    }
+});
+
+app.post('/api/customer/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+        const customer = await prisma.customer.findUnique({ where: { email } });
+
+        if (!customer) {
+            return res.status(404).json({ error: "No existe una cuenta con este correo electrónico." });
+        }
+
+        // Generar token único (64 hex chars)
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hora desde ahora
+
+        await prisma.customer.update({
+            where: { email },
+            data: {
+                resetPasswordToken: resetToken,
+                resetPasswordExpires: resetPasswordExpires
+            }
+        });
+
+        // Crear enlace (ajustado a la URL del frontend)
+        const resetLink = `${process.env.FRONTEND_CLIENT_URL || 'http://localhost:5173'}/reset-password/${resetToken}`;
+
+        const emailOptions = {
+            to: customer.email,
+            subject: 'Recuperación de Contraseña - Volper Seal',
+            text: `Has solicitado restablecer tu contraseña. Haz clic en el siguiente enlace para continuar: ${resetLink}. El enlace expira en 1 hora.`,
+            html: `
+                <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                    <h2 style="color: #333;">Recuperación de Contraseña</h2>
+                    <p>Hola <strong>${customer.name}</strong>,</p>
+                    <p>Has solicitado restablecer tu contraseña para tu cuenta en Volper Seal.</p>
+                    <p>Haz clic en el botón de abajo para elegir una nueva contraseña:</p>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="${resetLink}" style="background-color: #0ea5e9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Restablecer Contraseña</a>
+                    </div>
+                    <p style="font-size: 12px; color: #777;">Si no solicitaste este cambio, puedes ignorar este correo de forma segura.</p>
+                    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+                    <p style="font-size: 10px; color: #999;">Este enlace expira en 1 hora.</p>
+                </div>
+            `
+        };
+
+        const emailSent = await sendEmail(emailOptions);
+        if (!emailSent) {
+            return res.status(500).json({ error: "No se pudo enviar el correo de recuperación." });
+        }
+
+        res.json({ message: "Se ha enviado un correo con instrucciones para restablecer tu contraseña." });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error procesando la solicitud de recuperación." });
+    }
+});
+
+app.post('/api/customer/reset-password', async (req, res) => {
+    try {
+        const { token, password } = req.body;
+
+        const customer = await prisma.customer.findFirst({
+            where: {
+                resetPasswordToken: token,
+                resetPasswordExpires: { gt: new Date() } // Debe ser mayor a la hora actual
+            }
+        });
+
+        if (!customer) {
+            return res.status(400).json({ error: "El token de recuperación es inválido o ha expirado." });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        await prisma.customer.update({
+            where: { id: customer.id },
+            data: {
+                password: hashedPassword,
+                resetPasswordToken: null,
+                resetPasswordExpires: null
+            }
+        });
+
+        res.json({ message: "Tu contraseña ha sido actualizada con éxito. Ya puedes iniciar sesión." });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al restablecer la contraseña." });
     }
 });
 

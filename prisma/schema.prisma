@@ -100,16 +100,18 @@ model VariantDimension {
 }
 
 model Customer {
-  id        Int            @id @default(autoincrement())
-  name      String         @db.VarChar(150)
-  company   String?        @db.VarChar(150)
-  email     String?        @unique @db.VarChar(100)
-  password  String?        @db.VarChar(255) // Added for customer authentication
-  phone     String?        @db.VarChar(50)
-  address   String?
-  notes     String?
-  createdAt DateTime       @default(now())
-  quotes    QuoteRequest[]
+  id                   Int            @id @default(autoincrement())
+  name                 String         @db.VarChar(150)
+  company              String?        @db.VarChar(150)
+  email                String?        @unique @db.VarChar(100)
+  password             String?        @db.VarChar(255)
+  phone                String?        @db.VarChar(50)
+  address              String?
+  notes                String?
+  resetPasswordToken   String?        @db.VarChar(255)
+  resetPasswordExpires DateTime?
+  createdAt            DateTime       @default(now())
+  quotes               QuoteRequest[]
 }
 
 model InventoryMovement {
