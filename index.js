@@ -12,10 +12,15 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const https = require('https');
 
 const AUTH_SECRET = process.env.AUTH_SECRET || 'volper_secret_2024_key';
 
 const formatQuoteId = (id) => `COT-${String(id).padStart(5, '0')}`;
+console.log('--- BACKEND CONFIGURATION ---');
+console.log('DB:', process.env.DATABASE_URL ? 'OK' : 'MISSING');
+console.log('N8N WEBHOOK:', process.env.N8N_WHATSAPP_WEBHOOK_URL || 'NOT CONFIGURED');
+console.log('----------------------------');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const FRONTEND_URL = process.env.FRONTEND_URL || '*';
@@ -63,6 +68,58 @@ const sendEmail = async (options) => {
     } catch (error) {
         console.error('Error enviando email:', error);
         return false;
+    }
+};
+
+const notifyN8n = async (quote) => {
+    const webhookUrl = process.env.N8N_WHATSAPP_WEBHOOK_URL;
+    if (!webhookUrl) {
+        console.warn('⚠️ Webhook de n8n no configurado. Ignorando notificación...');
+        return;
+    }
+
+    try {
+        const url = new URL(webhookUrl);
+        const data = JSON.stringify({
+            id: formatQuoteId(quote.id),
+            rawId: quote.id,
+            company: quote.company || 'N/A',
+            contact: quote.contact,
+            phone: quote.phone || 'N/A',
+            email: quote.email,
+            items: quote.items.map(item => ({
+                sku: item.sku,
+                name: item.productName,
+                quantity: item.quantity
+            })),
+            timestamp: new Date().toISOString()
+        });
+
+        const options = {
+            hostname: url.hostname,
+            path: url.pathname + url.search,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(data)
+            }
+        };
+
+        const req = https.request(options, (res) => {
+            console.log(`[n8n] ✅ Notificación enviada. Status: ${res.statusCode}`);
+            res.on('data', (d) => {
+                console.log(`[n8n] Respuesta body: ${d}`);
+            });
+        });
+
+        req.on('error', (error) => {
+            console.error('[n8n] ❌ Error en la petición al webhook:', error.message);
+        });
+
+        req.write(data);
+        req.end();
+    } catch (error) {
+        console.error('[n8n] Error crítico notificando a n8n:', error);
     }
 };
 
@@ -439,6 +496,124 @@ app.get('/api/customer/quotes/:id', authenticateCustomer, async (req, res) => {
     }
 });
 
+// Editar ítems de una cotización (solo si está pendiente)
+app.put('/api/customer/quotes/:id/items', authenticateCustomer, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { items } = req.body;
+        const customerEmail = req.user.email;
+
+        const quote = await prisma.quoteRequest.findUnique({
+            where: { id: parseInt(id) }
+        });
+
+        if (!quote) return res.status(404).json({ error: "Cotización no encontrada" });
+        if (quote.email !== customerEmail) return res.status(403).json({ error: "No tienes permiso para editar esta cotización" });
+        if (quote.status !== 'pending') return res.status(400).json({ error: "Solo se pueden editar cotizaciones en estado pendiente" });
+
+        if (!items || items.length === 0) {
+            return res.status(400).json({ error: "La cotización debe tener al menos un producto" });
+        }
+
+        // Estrategia: borrar items existentes y recrear con los nuevos datos
+        const updatedQuote = await prisma.$transaction(async (tx) => {
+            await tx.quoteItem.deleteMany({ where: { quoteRequestId: parseInt(id) } });
+
+            await tx.quoteItem.createMany({
+                data: items.map(item => ({
+                    productName: item.productName,
+                    sku: item.sku,
+                    quantity: parseInt(item.quantity),
+                    price: 0,
+                    quoteRequestId: parseInt(id)
+                }))
+            });
+
+            return tx.quoteRequest.findUnique({
+                where: { id: parseInt(id) },
+                include: { items: true }
+            });
+        });
+
+        res.json({ ...updatedQuote, maskId: formatQuoteId(updatedQuote.id) });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al actualizar los ítems de la cotización" });
+    }
+});
+
+// Cancelar una cotización (solo si está pendiente)
+app.put('/api/customer/quotes/:id/cancel', authenticateCustomer, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const customerEmail = req.user.email;
+
+        const quote = await prisma.quoteRequest.findUnique({
+            where: { id: parseInt(id) }
+        });
+
+        if (!quote) return res.status(404).json({ error: "Cotización no encontrada" });
+        if (quote.email !== customerEmail) return res.status(403).json({ error: "No tienes permiso para cancelar esta cotización" });
+        if (quote.status !== 'pending') return res.status(400).json({ error: "Solo se pueden cancelar cotizaciones en estado pendiente" });
+
+        const updatedQuote = await prisma.quoteRequest.update({
+            where: { id: parseInt(id) },
+            data: { status: 'cancelled' },
+            include: { items: true }
+        });
+
+        res.json({ ...updatedQuote, maskId: formatQuoteId(updatedQuote.id) });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al cancelar la cotización" });
+    }
+});
+
+// Duplicar/Re-cotizar (crea una nueva cotización basada en una existente)
+app.post('/api/customer/quotes/:id/duplicate', authenticateCustomer, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const customerEmail = req.user.email;
+
+        const originalQuote = await prisma.quoteRequest.findUnique({
+            where: { id: parseInt(id) },
+            include: { items: true }
+        });
+
+        if (!originalQuote) return res.status(404).json({ error: "Cotización original no encontrada" });
+        if (originalQuote.email !== customerEmail) return res.status(403).json({ error: "No tienes permiso para duplicar esta cotización" });
+
+        const newQuote = await prisma.quoteRequest.create({
+            data: {
+                customerId: originalQuote.customerId,
+                company: originalQuote.company,
+                contact: originalQuote.contact,
+                phone: originalQuote.phone,
+                email: originalQuote.email,
+                status: 'pending',
+                items: {
+                    create: originalQuote.items.map(item => ({
+                        productName: item.productName,
+                        sku: item.sku,
+                        quantity: item.quantity,
+                        price: 0
+                    }))
+                }
+            },
+            include: { items: true }
+        });
+
+        // Notificar por WhatsApp la nueva re-cotización
+        notifyN8n(newQuote);
+        io.emit('new-quote', newQuote);
+
+        res.status(201).json({ ...newQuote, maskId: formatQuoteId(newQuote.id) });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al duplicar la cotización" });
+    }
+});
+
 // --- RUTAS DE ADMINISTRACIÓN (PROTEGIDAS) ---
 
 app.get('/api/admin/cotizaciones', authenticateAdmin, async (req, res) => {
@@ -508,6 +683,100 @@ app.get('/api/admin/cotizaciones/:id', authenticateAdmin, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Error al obtener la cotización" });
+    }
+});
+
+// Cambiar estado de una cotización (Admin)
+app.put('/api/admin/cotizaciones/:id/status', authenticateAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, adminNote } = req.body;
+
+        const validStatuses = ['pending', 'in_review', 'approved', 'rejected', 'cancelled', 'closed'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ error: `Estado inválido. Válidos: ${validStatuses.join(', ')}` });
+        }
+
+        const quote = await prisma.quoteRequest.findUnique({
+            where: { id: parseInt(id) },
+            include: { items: true }
+        });
+
+        if (!quote) return res.status(404).json({ error: "Cotización no encontrada" });
+
+        const updatedQuote = await prisma.quoteRequest.update({
+            where: { id: parseInt(id) },
+            data: { status },
+            include: { items: true }
+        });
+
+        const maskId = formatQuoteId(updatedQuote.id);
+        const statusLabels = {
+            pending: 'Pendiente',
+            in_review: 'En Revisión',
+            approved: 'Aprobada',
+            rejected: 'Rechazada',
+            cancelled: 'Cancelada',
+            closed: 'Cerrada'
+        };
+
+        // Notificación WebSocket al cliente en tiempo real
+        io.emit('quote-status-updated', {
+            quoteId: updatedQuote.id,
+            maskId,
+            status: updatedQuote.status,
+            statusLabel: statusLabels[status] || status,
+            adminNote: adminNote || '',
+            email: updatedQuote.email,
+            timestamp: new Date().toISOString()
+        });
+
+        // Notificación n8n/WhatsApp del cambio de estado
+        const webhookUrl = process.env.N8N_WHATSAPP_WEBHOOK_URL;
+        if (webhookUrl) {
+            try {
+                const url = new URL(webhookUrl);
+                const data = JSON.stringify({
+                    type: 'status_change',
+                    id: maskId,
+                    rawId: updatedQuote.id,
+                    status: updatedQuote.status,
+                    statusLabel: statusLabels[status] || status,
+                    contact: updatedQuote.contact,
+                    phone: updatedQuote.phone || '',
+                    email: updatedQuote.email,
+                    company: updatedQuote.company || '',
+                    adminNote: adminNote || '',
+                    itemCount: updatedQuote.items.length,
+                    timestamp: new Date().toISOString()
+                });
+
+                const options = {
+                    hostname: url.hostname,
+                    path: url.pathname + url.search,
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Length': Buffer.byteLength(data)
+                    }
+                };
+
+                const webhookReq = https.request(options, (webhookRes) => {
+                    console.log(`[n8n] ✅ Cambio de estado enviado. HTTP: ${webhookRes.statusCode}`);
+                });
+                webhookReq.on('error', (err) => console.error('[n8n] ❌ Error:', err.message));
+                webhookReq.write(data);
+                webhookReq.end();
+            } catch (webhookError) {
+                console.error('[n8n] Error en webhook de estado:', webhookError);
+            }
+        }
+
+        console.log(`[ADMIN] Cotización ${maskId} → "${status}" ${adminNote ? `| Nota: ${adminNote}` : ''}`);
+        res.json({ ...updatedQuote, maskId });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al actualizar el estado de la cotización" });
     }
 });
 
@@ -1202,6 +1471,10 @@ app.post('/api/cotizaciones', async (req, res) => {
         }
 
         io.emit('new-quote', cotizacion);
+
+        // Notificar a n8n para envío de WhatsApp
+        notifyN8n(cotizacion);
+
         res.status(201).json(cotizacion);
     } catch (error) {
         console.error(error);
