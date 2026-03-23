@@ -28,6 +28,7 @@ model Product {
   images       ProductImage[]
   variants     ProductVariant[]
   views        ProductView[]
+  favoritedBy  Favorite[]
 }
 
 model ProductView {
@@ -112,6 +113,7 @@ model Customer {
   resetPasswordExpires DateTime?
   createdAt            DateTime       @default(now())
   quotes               QuoteRequest[]
+  favorites            Favorite[]
 }
 
 model InventoryMovement {
@@ -138,4 +140,15 @@ model AdminUser {
   password  String   @db.VarChar(255)
   role      String   @default("admin")
   createdAt DateTime @default(now())
+}
+
+model Favorite {
+  id         Int      @id @default(autoincrement())
+  createdAt  DateTime @default(now())
+  customerId Int
+  productId  Int
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, productId])
 }

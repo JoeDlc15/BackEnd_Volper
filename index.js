@@ -447,6 +447,88 @@ app.put('/api/customer/profile', authenticateCustomer, async (req, res) => {
     }
 });
 
+// --- FAVORITOS PARA CLIENTES ---
+app.get('/api/favorites', authenticateCustomer, async (req, res) => {
+    try {
+        const favorites = await prisma.favorite.findMany({
+            where: { customerId: req.user.id },
+            select: { productId: true }
+        });
+        res.json(favorites.map(f => f.productId));
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al obtener favoritos" });
+    }
+});
+
+app.post('/api/favorites/toggle', authenticateCustomer, async (req, res) => {
+    try {
+        const { productId } = req.body;
+        if (!productId) return res.status(400).json({ error: "ID de producto requerido" });
+
+        const existing = await prisma.favorite.findUnique({
+            where: {
+                customerId_productId: {
+                    customerId: req.user.id,
+                    productId: parseInt(productId)
+                }
+            }
+        });
+
+        if (existing) {
+            await prisma.favorite.delete({ where: { id: existing.id } });
+            res.json({ action: 'removed', productId });
+        } else {
+            await prisma.favorite.create({
+                data: {
+                    customerId: req.user.id,
+                    productId: parseInt(productId)
+                }
+            });
+            res.json({ action: 'added', productId });
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al alternar favorito" });
+    }
+});
+
+app.post('/api/favorites/sync', authenticateCustomer, async (req, res) => {
+    try {
+        const { productIds } = req.body; // Array de IDs de localStorage
+        if (!Array.isArray(productIds)) return res.status(400).json({ error: "productIds debe ser un array" });
+
+        // Sincronizar (añadir los que no existan)
+        if (productIds.length > 0) {
+            const operations = productIds.map(id =>
+                prisma.favorite.upsert({
+                    where: {
+                        customerId_productId: {
+                            customerId: req.user.id,
+                            productId: parseInt(id)
+                        }
+                    },
+                    update: {},
+                    create: {
+                        customerId: req.user.id,
+                        productId: parseInt(id)
+                    }
+                })
+            );
+            await Promise.all(operations);
+        }
+
+        const allFavs = await prisma.favorite.findMany({
+            where: { customerId: req.user.id },
+            select: { productId: true }
+        });
+        res.json(allFavs.map(f => f.productId));
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al sincronizar favoritos" });
+    }
+});
+
 // --- RUTAS DE COTIZACIONES PARA CLIENTES ---
 
 app.get('/api/customer/quotes', authenticateCustomer, async (req, res) => {
@@ -730,47 +812,6 @@ app.put('/api/admin/cotizaciones/:id/status', authenticateAdmin, async (req, res
             email: updatedQuote.email,
             timestamp: new Date().toISOString()
         });
-
-        // Notificación n8n/WhatsApp del cambio de estado
-        const webhookUrl = process.env.N8N_WHATSAPP_WEBHOOK_URL;
-        if (webhookUrl) {
-            try {
-                const url = new URL(webhookUrl);
-                const data = JSON.stringify({
-                    type: 'status_change',
-                    id: maskId,
-                    rawId: updatedQuote.id,
-                    status: updatedQuote.status,
-                    statusLabel: statusLabels[status] || status,
-                    contact: updatedQuote.contact,
-                    phone: updatedQuote.phone || '',
-                    email: updatedQuote.email,
-                    company: updatedQuote.company || '',
-                    adminNote: adminNote || '',
-                    itemCount: updatedQuote.items.length,
-                    timestamp: new Date().toISOString()
-                });
-
-                const options = {
-                    hostname: url.hostname,
-                    path: url.pathname + url.search,
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Content-Length': Buffer.byteLength(data)
-                    }
-                };
-
-                const webhookReq = https.request(options, (webhookRes) => {
-                    console.log(`[n8n] ✅ Cambio de estado enviado. HTTP: ${webhookRes.statusCode}`);
-                });
-                webhookReq.on('error', (err) => console.error('[n8n] ❌ Error:', err.message));
-                webhookReq.write(data);
-                webhookReq.end();
-            } catch (webhookError) {
-                console.error('[n8n] Error en webhook de estado:', webhookError);
-            }
-        }
 
         console.log(`[ADMIN] Cotización ${maskId} → "${status}" ${adminNote ? `| Nota: ${adminNote}` : ''}`);
         res.json({ ...updatedQuote, maskId });

@@ -28,8 +28,8 @@ async function main() {
 
     const catEmpaques = await prisma.category.create({
         data: {
-            name: 'Empaquetaduras de Motor',
-            slug: 'empaquetaduras-motor',
+            name: 'Empaquetaduras',
+            slug: 'empaquetaduras',
             displayOrder: 2,
         },
     });
